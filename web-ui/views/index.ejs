@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Java Interview Practice</title>
+  <link rel="stylesheet" href="/public/styles.css">
+</head>
+<body>
+<div class="page-shell">
+  <aside class="catalog-panel">
+    <div class="brand-block">
+      <p class="eyebrow">Java Interview Practice</p>
+      <h1>Workbench</h1>
+      <p class="catalog-copy">Node.js serves the interface. Java runs the challenge evaluation. Solutions save directly into the local repository.</p>
+    </div>
+    <div id="challenge-list" class="challenge-list">
+      <% challenges.forEach(function (challenge) { %>
+        <button class="challenge-card<%= initialChallenge && challenge.id === initialChallenge.id ? ' active' : '' %>" data-challenge-id="<%= challenge.id %>">
+          <strong><%= challenge.title %></strong>
+          <span><%= challenge.difficulty %></span>
+        </button>
+      <% }); %>
+    </div>
+  </aside>
+
+  <main class="workspace">
+    <section class="workspace-header">
+      <div>
+        <p class="eyebrow">Challenge Workspace</p>
+        <h2 id="challenge-title"><%= initialChallenge ? initialChallenge.title : 'No Challenges' %></h2>
+        <p id="challenge-prompt" class="challenge-prompt"><%= initialChallenge ? initialChallenge.prompt : '' %></p>
+      </div>
+      <div class="control-strip">
+        <label>
+          User
+          <input id="user-id" type="text" value="guest">
+        </label>
+        <% if (availableProviders.length > 0) { %>
+        <label>
+          AI Provider
+          <select id="provider">
+            <% availableProviders.forEach(function (p) { %>
+              <option value="<%= p %>"><%= p %></option>
+            <% }); %>
+          </select>
+        </label>
+        <% } %>
+      </div>
+    </section>
+
+    <section class="challenge-meta">
+      <div class="meta-card">
+        <span class="meta-label">Difficulty</span>
+        <strong id="challenge-difficulty"><%= initialChallenge ? initialChallenge.difficulty : '' %></strong>
+      </div>
+      <div class="meta-card">
+        <span class="meta-label">Method Contract</span>
+        <strong id="challenge-contract"><%= initialChallenge ? initialChallenge.methodContract : '' %></strong>
+      </div>
+      <div class="meta-card meta-card-wide">
+        <span class="meta-label">Approach Note</span>
+        <strong id="challenge-explanation"><%= initialChallenge ? initialChallenge.explanation : '' %></strong>
+      </div>
+    </section>
+
+    <section class="editor-section">
+      <div class="section-heading">
+        <h3>Solution Editor</h3>
+        <div class="button-row">
+          <button id="run-tests" class="primary">Run Tests</button>
+          <button id="submit-solution">Submit</button>
+          <% if (availableProviders.length > 0) { %>
+          <button id="request-review">Review</button>
+          <button id="request-hint">Next Hint</button>
+          <% } %>
+        </div>
+      </div>
+      <textarea id="editor" spellcheck="false"><%= initialChallenge ? initialChallenge.starterCode : '' %></textarea>
+    </section>
+
+    <section class="info-grid">
+      <article class="panel">
+        <div class="section-heading">
+          <h3>Examples</h3>
+        </div>
+        <ul id="examples" class="stack-list">
+          <% if (initialChallenge) { initialChallenge.examples.forEach(function (example) { %>
+            <li><%= example %></li>
+          <% }); } %>
+        </ul>
+      </article>
+
+      <article class="panel">
+        <div class="section-heading">
+          <h3>Learning Resources</h3>
+        </div>
+        <ul id="resources" class="stack-list">
+          <% if (initialChallenge) { initialChallenge.resources.forEach(function (resource) { %>
+            <li><a href="<%= resource %>" target="_blank" rel="noreferrer"><%= resource %></a></li>
+          <% }); } %>
+        </ul>
+      </article>
+    </section>
+  </main>
+
+  <aside class="insights-panel">
+    <section class="panel result-panel">
+      <div class="section-heading">
+        <h3>Evaluation</h3>
+        <span id="result-status" class="status-pill">Idle</span>
+      </div>
+      <div id="result-summary" class="result-summary">Run tests to see pass/fail feedback.</div>
+      <ul id="test-results" class="stack-list compact"></ul>
+      <ul id="diagnostics" class="stack-list compact diagnostics"></ul>
+    </section>
+
+    <section class="panel save-panel">
+      <div class="section-heading">
+        <h3>Save &amp; Git</h3>
+      </div>
+      <div id="save-path" class="result-summary">Submit a solution to save it under <code>challenges/challenge-&lt;id&gt;/solutions/&lt;user&gt;.java</code>.</div>
+      <ul id="git-commands" class="stack-list compact"></ul>
+    </section>
+
+    <section class="panel coach-panel">
+      <div class="section-heading">
+        <h3>AI Coach</h3>
+      </div>
+      <div id="review-output" class="result-summary">Request a review or hint to see coaching feedback.</div>
+      <ul id="follow-up-questions" class="stack-list compact"></ul>
+    </section>
+
+    <section class="panel leaderboard-panel">
+      <div class="section-heading">
+        <h3>Leaderboard</h3>
+      </div>
+      <ul id="leaderboard" class="stack-list compact"></ul>
+    </section>
+  </aside>
+</div>
+
+<script>
+  window.__INITIAL_STATE__ = <%- initialStateJson %>;
+</script>
+<script src="/public/app.js"></script>
+</body>
+</html>

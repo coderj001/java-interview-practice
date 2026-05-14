@@ -1,0 +1,13 @@
+prefix_rule(
+    pattern = ["npx", ["@fission-ai/openspec@latest"]],
+    decision = "allow",
+    justification = "Common npx openspec operations."
+)
+
+
+prefix_rule(pattern=["git", ["status", "log"]], decision="allow")
+
+prefix_rule(
+    pattern = ["curl"],
+    decision = "allow"
+)

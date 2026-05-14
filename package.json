@@ -1,0 +1,10 @@
+{
+  "name": "java-interview-practice",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix web-ui run dev",
+    "start": "npm --prefix web-ui run start",
+    "test": "npm --prefix web-ui run test"
+  }
+}
