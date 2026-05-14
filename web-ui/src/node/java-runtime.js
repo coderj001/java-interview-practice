@@ -1,65 +1,68 @@
-const fs = require("node:fs");
-const path = require("node:path");
-const os = require("node:os");
-const { spawnSync } = require("node:child_process");
-const { runtimeChallengesRoot } = require("./challenge-loader");
+const http = require("node:http");
+const crypto = require("node:crypto");
 
-const repoRoot = path.resolve(__dirname, "..", "..", "..");
-const runtimeDir = path.join(repoRoot, ".java-runtime");
-const classesDir = path.join(runtimeDir, "classes");
-let compiled = false;
+const sandboxUrl = new URL(process.env.SANDBOX_RUNTIME_URL || "http://127.0.0.1:7070");
 
 function ensureJavaRuntimeCompiled() {
-  if (compiled) return;
-  fs.mkdirSync(classesDir, { recursive: true });
-  const javaFiles = collectJavaFiles(path.join(repoRoot, "src", "main", "java"));
-  const compileResult = spawnSync("javac", ["-d", classesDir, ...javaFiles], { cwd: repoRoot, encoding: "utf8" });
-  if (compileResult.status !== 0) throw new Error(`javac failed: ${compileResult.stderr || compileResult.stdout}`);
-  compiled = true;
+  // Kept for compatibility with server startup flow; sandbox service owns compilation.
 }
 
-function evaluateChallenge(challengeId, sourceCode) {
-  ensureJavaRuntimeCompiled();
-  ensureRuntimeChallengeExists(challengeId);
-  return JSON.parse(runWithSource(["evaluate", String(challengeId)], sourceCode));
-}
+async function evaluateChallenge(challengeId, sourceCode, options = {}) {
+  const payload = {
+    challengeId: String(challengeId),
+    sourceCode: String(sourceCode || ""),
+    timeoutMs: Number.parseInt(process.env.SANDBOX_JOB_TIMEOUT_MS || "3000", 10),
+    memoryMb: Number.parseInt(process.env.SANDBOX_JOB_MEMORY_MB || "128", 10),
+    networkModeRequested: options.networkModeRequested || "",
+    traceId: options.traceId || crypto.randomUUID()
+  };
 
-function runWithSource(args, sourceCode) {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "java-interview-practice-"));
-  const sourceFile = path.join(tempDir, "Solution.java");
-  fs.writeFileSync(sourceFile, sourceCode, "utf8");
-  try {
-    return runCli([...args, sourceFile]);
-  } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+  const response = await postJson(new URL("/execute", sandboxUrl), payload);
+  if (response.statusCode !== 200) {
+    const message = response.body && response.body.error
+      ? `Sandbox policy/execution rejected request: ${response.body.error}`
+      : "Sandbox runtime request failed.";
+    throw new Error(message);
   }
+  return response.body.evaluation;
 }
 
-function runCli(args) {
-  const result = spawnSync("java", ["-cp", classesDir, "com.interview.platform.web.ChallengeWorkbenchCli", ...args], {
-    cwd: repoRoot,
-    encoding: "utf8"
+function postJson(url, payload) {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        method: "POST",
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname,
+        protocol: url.protocol,
+        headers: {
+          "Content-Type": "application/json"
+        },
+        timeout: Number.parseInt(process.env.SANDBOX_HTTP_TIMEOUT_MS || "5000", 10)
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("end", () => {
+          try {
+            const raw = Buffer.concat(chunks).toString("utf8");
+            const body = raw ? JSON.parse(raw) : {};
+            resolve({ statusCode: res.statusCode || 500, body });
+          } catch (error) {
+            reject(error);
+          }
+        });
+      }
+    );
+
+    req.on("error", (error) => reject(error));
+    req.on("timeout", () => {
+      req.destroy(new Error("Sandbox HTTP request timed out."));
+    });
+
+    req.end(JSON.stringify(payload));
   });
-  if (result.status !== 0) throw new Error(result.stderr || result.stdout || "Java runtime command failed.");
-  return result.stdout;
-}
-
-function ensureRuntimeChallengeExists(challengeId) {
-  const challengeDir = path.join(runtimeChallengesRoot, `challenge-${challengeId}`);
-  if (!fs.existsSync(challengeDir)) {
-    throw new Error(`Runtime challenge files are missing for challenge ${challengeId}`);
-  }
-}
-
-function collectJavaFiles(rootDir) {
-  const entries = fs.readdirSync(rootDir, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    const fullPath = path.join(rootDir, entry.name);
-    if (entry.isDirectory()) files.push(...collectJavaFiles(fullPath));
-    else if (entry.isFile() && entry.name.endsWith(".java")) files.push(fullPath);
-  }
-  return files.sort();
 }
 
 module.exports = { ensureJavaRuntimeCompiled, evaluateChallenge };

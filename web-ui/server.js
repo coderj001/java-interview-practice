@@ -52,23 +52,23 @@ app.get("/api/challenges/:challengeId", (req, res) => {
   return res.json(challenge);
 });
 
-app.post("/api/challenges/:challengeId/run-tests", (req, res) => {
+app.post("/api/challenges/:challengeId/run-tests", async (req, res) => {
   try {
     const challengeId = requireChallengeId(req.params.challengeId);
-    const evaluation = evaluateChallenge(challengeId, req.body.code || "");
+    const evaluation = await evaluateChallenge(challengeId, req.body.code || "");
     res.json(evaluation);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-app.post("/api/challenges/:challengeId/submit", (req, res) => {
+app.post("/api/challenges/:challengeId/submit", async (req, res) => {
   try {
     const challengeId = requireChallengeId(req.params.challengeId);
     const userId = normalizeUserId(req.body.userId || "guest");
     const sourceCode = String(req.body.code || "");
     const saveResult = solutionStore.save({ challengeId, userId, sourceCode });
-    const evaluation = evaluateChallenge(challengeId, sourceCode);
+    const evaluation = await evaluateChallenge(challengeId, sourceCode);
 
     writeChallengesFile((data) => {
       const challenge = data.challenges.find((entry) => Number(entry.id) === Number(challengeId));

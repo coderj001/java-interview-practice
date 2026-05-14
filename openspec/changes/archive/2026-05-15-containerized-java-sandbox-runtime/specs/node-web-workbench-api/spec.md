@@ -1,8 +1,4 @@
-## Purpose
-
-TBD
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Node API for challenge and submission workflow
 The system MUST provide Node.js HTTP endpoints for challenge listing and solution submission, and MUST route evaluation execution through sandbox runtime with policy-aware execution controls.

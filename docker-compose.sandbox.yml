@@ -1,0 +1,25 @@
+services:
+  sandbox-runtime:
+    build:
+      context: .
+      dockerfile: sandbox-runtime/Dockerfile
+    environment:
+      SANDBOX_PORT: "7070"
+      SANDBOX_DEFAULT_NETWORK_MODE: "none"
+      SANDBOX_ALLOW_NETWORK_OVERRIDE: "false"
+      SANDBOX_ALLOWED_NETWORK_MODES: "bridge"
+      SANDBOX_MAX_TIMEOUT_MS: "5000"
+      SANDBOX_MAX_MEMORY_MB: "256"
+    ports:
+      - "7070:7070"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.java-runtime
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0

@@ -58,9 +58,9 @@
       "notes": "",
       "score": 100,
       "bestScore": 100,
-      "attempts": 1,
-      "timeSpentMs": 16816,
-      "completedAt": "2026-05-14T18:58:45.687Z",
+      "attempts": 2,
+      "timeSpentMs": 114869,
+      "completedAt": "2026-05-14T19:23:42.275Z",
       "status": "completed"
     },
     {
@@ -158,12 +158,12 @@
         "Edges: [[1,2]], start=1, target=3 -> -1"
       ],
       "notes": "",
-      "score": null,
-      "bestScore": 0,
-      "attempts": 0,
+      "score": 33,
+      "bestScore": 33,
+      "attempts": 1,
       "timeSpentMs": 0,
       "completedAt": null,
-      "status": "not-started"
+      "status": "in-progress"
     },
     {
       "id": 24,

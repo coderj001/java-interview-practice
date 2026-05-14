@@ -1,33 +1,37 @@
 # Java Interview Practice
 
-Node-hosted Java interview practice workspace with an Express + EJS UI (`web-ui/`) and a Java execution runtime (`src/main/java`).
+Node-hosted Java interview practice workspace with an Express + EJS UI (`web-ui/`) and a containerized Java sandbox runtime (`sandbox-runtime/`).
 
 ## Prerequisites
 
 - Node.js
-- JDK 17 or newer
+- Docker or Podman
 - Optional: Maven, if you want to run `mvn test`
 
-`npm start` and `npm run dev` rely on local `java` and `javac`.
+## Startup
 
-## Quick Start
-
-Install web UI dependencies once:
+First-time setup:
 
 ```bash
 npm install --prefix web-ui
 ```
 
-Start the app from the repo root:
+Start sandbox runtime container:
+
+```bash
+docker compose -f docker-compose.sandbox.yml up --build -d
+```
+
+Verify sandbox is healthy:
+
+```bash
+curl http://127.0.0.1:7070/health
+```
+
+Start the web app:
 
 ```bash
 npm start
-```
-
-Start with auto-reload:
-
-```bash
-npm run dev
 ```
 
 Open:
@@ -36,53 +40,30 @@ Open:
 http://localhost:3000
 ```
 
-## How to Use
+Stop services:
 
-1. Start the server with `npm start` or `npm run dev`.
-2. Open `http://localhost:3000`.
-3. Select a challenge.
-4. Edit the `Solution` class.
-5. Click `Run Tests` for deterministic feedback.
-6. Click `Submit` to save the solution under `challenges/challenge-<id>/solutions/<user>.java`.
-7. Use `Review` or `Next Hint` for interview-style guidance.
+```bash
+docker compose -f docker-compose.sandbox.yml down
+```
 
-## Project Layout
+## Sandbox Environment Contract
 
-- [web-ui/server.js](/Users/raju/Develop/Personal/java-interview-practice/web-ui/server.js): Express server and route wiring
-- [web-ui/views/index.ejs](/Users/raju/Develop/Personal/java-interview-practice/web-ui/views/index.ejs): server-rendered page template
-- [web-ui/public/app.js](/Users/raju/Develop/Personal/java-interview-practice/web-ui/public/app.js): browser client behavior
-- [web-ui/public/styles.css](/Users/raju/Develop/Personal/java-interview-practice/web-ui/public/styles.css): UI styling
-- [web-ui/src/node/challenge-loader.js](/Users/raju/Develop/Personal/java-interview-practice/web-ui/src/node/challenge-loader.js): challenge filesystem loader
-- [web-ui/src/node/java-runtime.js](/Users/raju/Develop/Personal/java-interview-practice/web-ui/src/node/java-runtime.js): Node-to-Java runtime bridge
-- [web-ui/src/node/solution-store.js](/Users/raju/Develop/Personal/java-interview-practice/web-ui/src/node/solution-store.js): deterministic local persistence
-- [challenges](/Users/raju/Develop/Personal/java-interview-practice/challenges): challenge folders with metadata, starter code, visible tests, and saved solutions
-- [src/main/java/com/interview/platform/web/ChallengeWorkbench.java](/Users/raju/Develop/Personal/java-interview-practice/src/main/java/com/interview/platform/web/ChallengeWorkbench.java): Java challenge execution and coaching logic
+Web UI runtime:
 
-## API Endpoints
+- `SANDBOX_RUNTIME_URL` (default: `http://127.0.0.1:7070`)
+- `SANDBOX_JOB_TIMEOUT_MS` (default: `3000`)
+- `SANDBOX_JOB_MEMORY_MB` (default: `128`)
+- `SANDBOX_HTTP_TIMEOUT_MS` (default: `5000`)
 
-- `GET /`
-- `GET /api/challenges`
-- `GET /api/challenges/{id}`
-- `POST /api/challenges/{id}/run-tests`
-- `POST /api/challenges/{id}/submit`
-- `POST /api/challenges/{id}/review`
-- `POST /api/challenges/{id}/hint`
-- `GET /api/leaderboard`
+Sandbox runtime policy:
 
-`POST` endpoints use `application/x-www-form-urlencoded`.
+- `SANDBOX_DEFAULT_NETWORK_MODE` (default: `none`)
+- `SANDBOX_ALLOW_NETWORK_OVERRIDE` (default: `false`)
+- `SANDBOX_ALLOWED_NETWORK_MODES` (default: `bridge`)
+- `SANDBOX_MAX_TIMEOUT_MS` (default: `5000`)
+- `SANDBOX_MAX_MEMORY_MB` (default: `256`)
 
 ## Verification
-
-Success criteria:
-
-- `npm start` starts without errors
-- `npm run dev` starts with watch mode
-- `http://localhost:3000` loads the UI
-- `GET /api/challenges` returns challenge data from `challenges/`
-- `Run Tests` works for a valid `Solution` class
-- `Submit` saves a file under `challenges/challenge-<id>/solutions/`
-- `Submit` updates the leaderboard
-- `Submit` returns Git guidance or a clear non-git explanation
 
 Run Node tests:
 
@@ -95,12 +76,6 @@ If Maven is installed, you can also run:
 ```bash
 mvn test
 ```
-
-## Current Limitations
-
-- Challenge execution is local and not sandboxed
-- Leaderboard storage is in memory only
-- AI review and hint providers are stubbed abstractions, not live API integrations
 
 ## OpenSpec
 
