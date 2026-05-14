@@ -5,7 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const { createSolutionStore } = require("../src/node/solution-store");
-const { challengesRoot, listChallenges } = require("../src/node/challenge-loader");
+const { challengesJsonPath, listChallenges } = require("../src/node/challenge-loader");
 const { buildGitGuidance } = require("../src/node/git-guidance");
 const { normalizeChallengeId, normalizeUserId } = require("../src/node/validation");
 
@@ -13,16 +13,8 @@ test("solution store saves to deterministic challenge and user path", () => {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "solution-store-"));
   const store = createSolutionStore(rootDir);
 
-  const first = store.save({
-    challengeId: "24",
-    userId: "raju",
-    sourceCode: "class Solution {}"
-  });
-  const second = store.save({
-    challengeId: "24",
-    userId: "raju",
-    sourceCode: "class Solution { int value = 1; }"
-  });
+  const first = store.save({ challengeId: "24", userId: "raju", sourceCode: "class Solution {}" });
+  const second = store.save({ challengeId: "24", userId: "raju", sourceCode: "class Solution { int value = 1; }" });
 
   assert.equal(first.relativePath, "challenges/challenge-24/solutions/raju.java");
   assert.equal(second.relativePath, "challenges/challenge-24/solutions/raju.java");
@@ -48,12 +40,12 @@ test("validation rejects unsafe path segments", () => {
   assert.throws(() => normalizeUserId("raju/test"), /letters, numbers, underscores, and hyphens/);
 });
 
-test("challenge loader reads seeded challenge folders", () => {
+test("challenge loader reads challenges.json", () => {
   const challenges = listChallenges();
   assert.ok(challenges.length >= 3);
-  const challenge = challenges.find((item) => item.id === "1");
+  const challenge = challenges.find((item) => Number(item.id) === 1);
   assert.ok(challenge);
-  assert.match(challenge.prompt, /solve/);
+  assert.match(challenge.details, /solve/);
   assert.match(challenge.starterCode, /public class Solution/);
-  assert.equal(fs.existsSync(challengesRoot), true);
+  assert.equal(fs.existsSync(challengesJsonPath), true);
 });

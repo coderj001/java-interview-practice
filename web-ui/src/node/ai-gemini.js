@@ -1,7 +1,7 @@
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
 
-async function reviewCode(challenge, code, apiKey) {
-  const prompt = buildReviewPrompt(challenge, code);
+async function reviewCode(challenge, code, apiKey, systemPrompt) {
+  const prompt = buildReviewPrompt(challenge, code, systemPrompt);
   const content = await callGemini(prompt, apiKey);
   const parsed = parseStructuredJson(content);
   return {
@@ -11,21 +11,16 @@ async function reviewCode(challenge, code, apiKey) {
   };
 }
 
-async function hintCode(challenge, code, level, apiKey) {
-  const prompt = buildHintPrompt(challenge, code, level);
+async function hintCode(challenge, code, level, apiKey, systemPrompt) {
+  const prompt = buildHintPrompt(challenge, code, level, systemPrompt);
   const content = await callGemini(prompt, apiKey);
   const parsed = parseStructuredJson(content);
-  const normalizedLevel = normalizeLevel(level);
-  return {
-    level: normalizedLevel,
-    nextLevel: normalizedLevel === "4" ? "max" : String(Number.parseInt(normalizedLevel, 10) + 1),
-    hint: asString(parsed.hint)
-  };
+  return { hint: asString(parsed.hint) };
 }
 
-function buildReviewPrompt(challenge, code) {
+function buildReviewPrompt(challenge, code, systemPrompt) {
   return [
-    "You are a Java interview coach.",
+    systemPrompt || "You are a Java interview coach.",
     "Return only JSON with keys: qualityAssessment, improvementSuggestion, followUpQuestions.",
     "followUpQuestions must be an array of strings.",
     "",
@@ -39,9 +34,9 @@ function buildReviewPrompt(challenge, code) {
     challenge.methodContract || "",
     "```",
     "",
-    "Prompt description:",
+    "Challenge details:",
     "```text",
-    challenge.prompt || "",
+    challenge.details || "",
     "```",
     "",
     "User code:",
@@ -51,13 +46,16 @@ function buildReviewPrompt(challenge, code) {
   ].join("\n");
 }
 
-function buildHintPrompt(challenge, code, level) {
-  const normalizedLevel = normalizeLevel(level);
+function buildHintPrompt(challenge, code, level, systemPrompt) {
+  const hintContext = Array.isArray(challenge.hints) ? challenge.hints.join("\n- ") : "";
+  const guidanceStyle = challenge?.rules?.guidanceStyle || "socratic";
   return [
-    "You are a Java interview coach.",
+    systemPrompt || "You are a Java interview coach.",
     "Return only JSON with key: hint.",
     "Give a concise hint appropriate for the requested level.",
-    `Hint level: ${normalizedLevel} (1 = subtle, 4 = very specific).`,
+    `Hint level: ${level}.`,
+    `Guidance style: ${guidanceStyle}.`,
+    `Challenge hints:\n- ${hintContext}`,
     "",
     "Challenge title:",
     "```text",
@@ -69,9 +67,9 @@ function buildHintPrompt(challenge, code, level) {
     challenge.methodContract || "",
     "```",
     "",
-    "Prompt description:",
+    "Challenge details:",
     "```text",
-    challenge.prompt || "",
+    challenge.details || "",
     "```",
     "",
     "User code:",
@@ -85,25 +83,14 @@ async function callGemini(prompt, apiKey) {
   const response = await fetch(`${GEMINI_ENDPOINT}?key=${encodeURIComponent(apiKey)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }]
-    })
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
   });
 
-  if (!response.ok) {
-    throw new Error(`Gemini request failed with status ${response.status}`);
-  }
+  if (!response.ok) throw new Error(`Gemini request failed with status ${response.status}`);
 
   const payload = await response.json();
-  const text = payload.candidates && payload.candidates[0] && payload.candidates[0].content
-    && payload.candidates[0].content.parts && payload.candidates[0].content.parts[0]
-    ? payload.candidates[0].content.parts[0].text
-    : "";
-
-  if (!text) {
-    throw new Error("Gemini response did not include text content.");
-  }
-
+  const text = payload.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  if (!text) throw new Error("Gemini response did not include text content.");
   return text;
 }
 
@@ -112,16 +99,9 @@ function parseStructuredJson(text) {
     return JSON.parse(text);
   } catch (_error) {
     const matched = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-    if (!matched) {
-      throw new Error("Unable to parse Gemini response as JSON.");
-    }
+    if (!matched) throw new Error("Unable to parse Gemini response as JSON.");
     return JSON.parse(matched[1]);
   }
-}
-
-function normalizeLevel(level) {
-  const value = String(level || "").trim();
-  return ["1", "2", "3", "4"].includes(value) ? value : "1";
 }
 
 function asString(value) {
@@ -129,10 +109,7 @@ function asString(value) {
 }
 
 function asStringArray(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.filter((item) => typeof item === "string");
+  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
 }
 
 module.exports = {

@@ -2,56 +2,59 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
-const challengesRoot = path.join(repoRoot, "challenges");
+const challengesJsonPath = path.join(repoRoot, "challenges.json");
+const runtimeChallengesRoot = path.join(repoRoot, ".java-runtime", "challenges");
 
-function listChallenges() {
-  const entries = fs.readdirSync(challengesRoot, { withFileTypes: true });
-  const challenges = [];
-  for (const entry of entries) {
-    if (!entry.isDirectory() || !entry.name.startsWith("challenge-")) {
-      continue;
-    }
-    const challengeDir = path.join(challengesRoot, entry.name);
-    challenges.push(loadChallenge(challengeDir));
-  }
-  challenges.sort((left, right) => Number.parseInt(left.id, 10) - Number.parseInt(right.id, 10));
-  return challenges;
-}
-
-function resolveChallengeDirectory(challengeId) {
-  return path.join(challengesRoot, `challenge-${challengeId}`);
-}
-
-function loadChallenge(challengeDir) {
-  const metadataPath = path.join(challengeDir, "challenge.json");
-  const promptPath = path.join(challengeDir, "prompt.md");
-  const starterPath = path.join(challengeDir, "starter", "Solution.java");
-  const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
-  const prompt = fs.readFileSync(promptPath, "utf8").trimEnd();
-  const starterCode = fs.readFileSync(starterPath, "utf8");
-
+function loadChallengesFile() {
+  const payload = JSON.parse(fs.readFileSync(challengesJsonPath, "utf8"));
+  const challenges = Array.isArray(payload.challenges) ? payload.challenges : [];
+  challenges.sort((a, b) => Number(a.id) - Number(b.id));
   return {
-    id: String(metadata.id),
-    title: String(metadata.title),
-    difficulty: String(metadata.difficulty),
-    prompt,
-    explanation: String(metadata.explanation),
-    starterCode,
-    methodContract: String(metadata.methodContract),
-    resources: normalizeStringArray(metadata.resources),
-    examples: normalizeStringArray(metadata.examples)
+    systemPrompt: typeof payload.systemPrompt === "string" ? payload.systemPrompt : "system-prompt.md",
+    challenges
   };
 }
 
-function normalizeStringArray(value) {
-  if (!Array.isArray(value)) {
-    return [];
+function listChallenges() {
+  return loadChallengesFile().challenges;
+}
+
+function challengeById(challengeId) {
+  const id = Number(challengeId);
+  return listChallenges().find((challenge) => Number(challenge.id) === id) || null;
+}
+
+function writeChallengesFile(mutator) {
+  const data = loadChallengesFile();
+  const next = mutator(data) || data;
+  const tempPath = `${challengesJsonPath}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(next, null, 2) + "\n", "utf8");
+  fs.renameSync(tempPath, challengesJsonPath);
+  return next;
+}
+
+function extractChallengeRuntimeFiles() {
+  const { challenges } = loadChallengesFile();
+  fs.mkdirSync(runtimeChallengesRoot, { recursive: true });
+
+  for (const challenge of challenges) {
+    const challengeRoot = path.join(runtimeChallengesRoot, `challenge-${challenge.id}`);
+    const starterPath = path.join(challengeRoot, "starter", "Solution.java");
+    const testsPath = path.join(challengeRoot, "tests", "visible-tests.json");
+    fs.mkdirSync(path.dirname(starterPath), { recursive: true });
+    fs.mkdirSync(path.dirname(testsPath), { recursive: true });
+    fs.writeFileSync(starterPath, String(challenge.starterCode || ""), "utf8");
+    fs.writeFileSync(testsPath, JSON.stringify(challenge.testCases || [], null, 2) + "\n", "utf8");
   }
-  return value.map((item) => String(item));
 }
 
 module.exports = {
+  repoRoot,
+  challengesJsonPath,
+  runtimeChallengesRoot,
+  loadChallengesFile,
   listChallenges,
-  resolveChallengeDirectory,
-  challengesRoot
+  challengeById,
+  writeChallengesFile,
+  extractChallengeRuntimeFiles
 };

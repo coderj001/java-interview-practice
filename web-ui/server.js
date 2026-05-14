@@ -2,7 +2,14 @@ const path = require("node:path");
 const express = require("express");
 const { ensureJavaRuntimeCompiled, evaluateChallenge } = require("./src/node/java-runtime");
 const { availableProviders, reviewCode, hintCode } = require("./src/node/ai-provider");
-const { listChallenges, challengesRoot } = require("./src/node/challenge-loader");
+const {
+  listChallenges,
+  challengeById,
+  writeChallengesFile,
+  extractChallengeRuntimeFiles,
+  loadChallengesFile,
+  runtimeChallengesRoot
+} = require("./src/node/challenge-loader");
 const { createSolutionStore } = require("./src/node/solution-store");
 const { createLeaderboardStore } = require("./src/node/leaderboard-store");
 const { buildGitGuidance } = require("./src/node/git-guidance");
@@ -15,41 +22,34 @@ const repoRoot = path.resolve(__dirname, "..");
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 app.use(express.urlencoded({ extended: false, limit: "1mb" }));
+app.use(express.json({ limit: "1mb" }));
 app.use("/public", express.static(path.join(__dirname, "public")));
 
+extractChallengeRuntimeFiles();
 ensureJavaRuntimeCompiled();
 
-const challenges = listChallenges();
-const challengesById = new Map(challenges.map((challenge) => [challenge.id, challenge]));
-const solutionStore = createSolutionStore(challengesRoot);
+const solutionStore = createSolutionStore(path.join(runtimeChallengesRoot));
 const leaderboard = createLeaderboardStore();
 
-app.get("/", (req, res) => {
-  const initialChallenge = challenges[0] || null;
+app.get("/", (_req, res) => {
+  const challenges = listChallenges();
   res.render("index", {
-    challenges,
-    initialChallenge,
     availableProviders,
-    initialStateJson: JSON.stringify({
-      challenges,
-      initialChallengeId: initialChallenge ? initialChallenge.id : null,
-      leaderboard: leaderboard.top()
-    })
+    initialStateJson: JSON.stringify({ challenges, availableProviders })
   });
 });
 
-app.get("/api/challenges", (req, res) => {
-  res.json({ challenges });
+app.get("/api/challenges", (_req, res) => {
+  const challenges = listChallenges();
+  const completed = challenges.filter((challenge) => challenge.status === "completed").length;
+  const progress = challenges.length ? Math.round((completed / challenges.length) * 100) : 0;
+  res.json({ challenges, progress });
 });
 
 app.get("/api/challenges/:challengeId", (req, res) => {
-  const challengeId = normalizeChallengeId(req.params.challengeId);
-  const challenge = challengesById.get(challengeId);
-  if (!challenge) {
-    res.status(404).json({ error: `Unknown challenge: ${challengeId}` });
-    return;
-  }
-  res.json(challenge);
+  const challenge = challengeById(normalizeChallengeId(req.params.challengeId));
+  if (!challenge) return res.status(404).json({ error: `Unknown challenge: ${req.params.challengeId}` });
+  return res.json(challenge);
 });
 
 app.post("/api/challenges/:challengeId/run-tests", (req, res) => {
@@ -70,6 +70,22 @@ app.post("/api/challenges/:challengeId/submit", (req, res) => {
     const saveResult = solutionStore.save({ challengeId, userId, sourceCode });
     const evaluation = evaluateChallenge(challengeId, sourceCode);
 
+    writeChallengesFile((data) => {
+      const challenge = data.challenges.find((entry) => Number(entry.id) === Number(challengeId));
+      if (!challenge) return data;
+      const score = Number(evaluation.correctnessPoints || 0);
+      challenge.score = score;
+      challenge.bestScore = Math.max(Number(challenge.bestScore || 0), score);
+      challenge.attempts = Number(challenge.attempts || 0) + 1;
+      if (score === 100) {
+        challenge.status = "completed";
+        challenge.completedAt = new Date().toISOString();
+      } else if (challenge.status === "not-started") {
+        challenge.status = "in-progress";
+      }
+      return data;
+    });
+
     leaderboard.record(userId, evaluation.correctnessPoints);
 
     res.json({
@@ -77,66 +93,83 @@ app.post("/api/challenges/:challengeId/submit", (req, res) => {
       userId,
       savePath: saveResult.relativePath,
       evaluation,
-      git: buildGitGuidance({
-        cwd: repoRoot,
-        relativeSavePath: saveResult.relativePath,
-        challengeId,
-        userId
-      })
+      git: buildGitGuidance({ cwd: repoRoot, relativeSavePath: saveResult.relativePath, challengeId, userId })
     });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-app.post("/api/challenges/:challengeId/review", (req, res) => {
-  (async () => {
-    try {
-      const challengeId = requireChallengeId(req.params.challengeId);
-      const provider = String(req.body.provider || "");
-      const challenge = challengesById.get(challengeId);
-      const review = await reviewCode(provider, challenge, req.body.code || "");
-      res.json({ provider, ...review });
-    } catch (error) {
-      if (error.message && error.message.startsWith("Provider not available: ")) {
-        res.status(503).json({ error: error.message });
-        return;
-      }
-      res.status(400).json({ error: error.message });
-    }
-  })();
-});
-
-app.post("/api/challenges/:challengeId/hint", (req, res) => {
-  (async () => {
+app.post("/api/challenges/:challengeId/time", (req, res) => {
+  try {
     const challengeId = requireChallengeId(req.params.challengeId);
-    try {
-      const provider = String(req.body.provider || "");
-      const challenge = challengesById.get(challengeId);
-      const hint = await hintCode(provider, challenge, req.body.code || "", req.body.currentLevel || "");
-      res.json({ provider, ...hint });
-    } catch (error) {
-      if (error.message && error.message.startsWith("Provider not available: ")) {
-        res.status(503).json({ error: error.message });
-        return;
-      }
-      res.status(400).json({ error: error.message });
-    }
-  })();
+    const elapsedMs = Math.max(0, Number.parseInt(String(req.body.elapsedMs || "0"), 10) || 0);
+    writeChallengesFile((data) => {
+      const challenge = data.challenges.find((entry) => Number(entry.id) === Number(challengeId));
+      if (!challenge) return data;
+      challenge.timeSpentMs = Number(challenge.timeSpentMs || 0) + elapsedMs;
+      if (challenge.status === "not-started") challenge.status = "in-progress";
+      return data;
+    });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
 });
 
-app.get("/api/leaderboard", (req, res) => {
+app.post("/api/challenges/:challengeId/notes", (req, res) => {
+  try {
+    const challengeId = requireChallengeId(req.params.challengeId);
+    const notes = String(req.body.notes || "");
+    writeChallengesFile((data) => {
+      const challenge = data.challenges.find((entry) => Number(entry.id) === Number(challengeId));
+      if (!challenge) return data;
+      challenge.notes = notes;
+      return data;
+    });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/challenges/:challengeId/review", async (req, res) => {
+  try {
+    const challengeId = requireChallengeId(req.params.challengeId);
+    const provider = String(req.body.provider || "");
+    const challenge = challengeById(challengeId);
+    const review = await reviewCode(provider, challenge, req.body.code || "");
+    res.json({ provider, ...review });
+  } catch (error) {
+    if (error.message?.startsWith("Provider not available: ")) return res.status(503).json({ error: error.message });
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/challenges/:challengeId/hint", async (req, res) => {
+  try {
+    const challengeId = requireChallengeId(req.params.challengeId);
+    const provider = String(req.body.provider || "");
+    const challenge = challengeById(challengeId);
+    const hint = await hintCode(provider, challenge, req.body.code || "", req.body.currentLevel || "");
+    res.json({ provider, ...hint });
+  } catch (error) {
+    if (error.message?.startsWith("Provider not available: ")) return res.status(503).json({ error: error.message });
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/leaderboard", (_req, res) => {
   res.json({ entries: leaderboard.top() });
 });
 
 app.listen(port, () => {
-  process.stdout.write(`Java Interview Practice UI running at http://localhost:${port}\n`);
+  const configuredPrompt = loadChallengesFile().systemPrompt;
+  process.stdout.write(`Java Interview Practice UI running at http://localhost:${port} (system prompt: ${configuredPrompt})\n`);
 });
 
 function requireChallengeId(rawChallengeId) {
   const challengeId = normalizeChallengeId(rawChallengeId);
-  if (!challengesById.has(challengeId)) {
-    throw new Error(`Unknown challenge: ${challengeId}`);
-  }
+  if (!challengeById(challengeId)) throw new Error(`Unknown challenge: ${challengeId}`);
   return challengeId;
 }
