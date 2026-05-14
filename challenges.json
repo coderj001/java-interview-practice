@@ -5,49 +5,153 @@
       "id": 1,
       "title": "Sum of Two Numbers",
       "level": "beginner",
-      "tags": ["math", "basics"],
+      "tags": [
+        "math",
+        "basics"
+      ],
       "details": "Implement `solve(int a, int b)` and return the sum of the two inputs.",
       "methodContract": "int solve(int a, int b)",
       "explanation": "Use integer addition.",
       "starterCode": "public class Solution {\n    public int solve(int a, int b) {\n        return a + b;\n    }\n}\n",
       "testCases": [
-        {"name": "solve", "input": [2, 3], "expected": 5},
-        {"name": "solve", "input": [-4, 10], "expected": 6},
-        {"name": "solve", "input": [0, 0], "expected": 0}
+        {
+          "name": "solve",
+          "input": [
+            2,
+            3
+          ],
+          "expected": 5
+        },
+        {
+          "name": "solve",
+          "input": [
+            -4,
+            10
+          ],
+          "expected": 6
+        },
+        {
+          "name": "solve",
+          "input": [
+            0,
+            0
+          ],
+          "expected": 0
+        }
       ],
-      "hints": ["Think about Java integer addition.", "The `+` operator on two ints gives the sum."],
-      "rules": {"maxHintLevel": 3, "guidanceStyle": "socratic"},
-      "resources": ["https://docs.oracle.com/javase/tutorial/java/nutsandbolts/"],
+      "hints": [
+        "Think about Java integer addition.",
+        "The `+` operator on two ints gives the sum."
+      ],
+      "rules": {
+        "maxHintLevel": 3,
+        "guidanceStyle": "socratic"
+      },
+      "resources": [
+        "https://docs.oracle.com/javase/tutorial/java/nutsandbolts/"
+      ],
       "examples": [
         "Input: (2, 3) -> Output: 5",
         "Input: (-4, 10) -> Output: 6",
         "Input: (0, 0) -> Output: 0"
       ],
       "notes": "",
-      "score": null,
-      "bestScore": 0,
-      "attempts": 0,
-      "timeSpentMs": 0,
-      "completedAt": null,
-      "status": "not-started"
+      "score": 100,
+      "bestScore": 100,
+      "attempts": 1,
+      "timeSpentMs": 16816,
+      "completedAt": "2026-05-14T18:58:45.687Z",
+      "status": "completed"
     },
     {
       "id": 4,
       "title": "Concurrent Graph BFS Queries",
       "level": "intermediate",
-      "tags": ["graphs", "bfs", "concurrency"],
+      "tags": [
+        "graphs",
+        "bfs",
+        "concurrency"
+      ],
       "details": "Implement `solve(int[][] edges, int start, int target)` and return the shortest hop count in an undirected graph. Return `-1` when no path exists.",
       "methodContract": "int solve(int[][] edges, int start, int target)",
       "explanation": "Use BFS and careful state handling.",
       "starterCode": "public class Solution {\n    public int solve(int[][] edges, int start, int target) {\n        return -1;\n    }\n}\n",
       "testCases": [
-        {"name": "solve", "input": [[[1,2],[2,3],[3,4]], 1, 4], "expected": 3},
-        {"name": "solve", "input": [[[1,2],[1,3],[2,4],[3,4]], 2, 3], "expected": 2},
-        {"name": "solve", "input": [[[1,2]], 1, 3], "expected": -1}
+        {
+          "name": "solve",
+          "input": [
+            [
+              [
+                1,
+                2
+              ],
+              [
+                2,
+                3
+              ],
+              [
+                3,
+                4
+              ]
+            ],
+            1,
+            4
+          ],
+          "expected": 3
+        },
+        {
+          "name": "solve",
+          "input": [
+            [
+              [
+                1,
+                2
+              ],
+              [
+                1,
+                3
+              ],
+              [
+                2,
+                4
+              ],
+              [
+                3,
+                4
+              ]
+            ],
+            2,
+            3
+          ],
+          "expected": 2
+        },
+        {
+          "name": "solve",
+          "input": [
+            [
+              [
+                1,
+                2
+              ]
+            ],
+            1,
+            3
+          ],
+          "expected": -1
+        }
       ],
-      "hints": ["Build adjacency from edges first.", "Use a queue and visited set.", "Track depth by BFS levels."],
-      "rules": {"maxHintLevel": 3, "guidanceStyle": "socratic"},
-      "resources": ["https://docs.oracle.com/javase/tutorial/essential/concurrency/"],
+      "hints": [
+        "Build adjacency from edges first.",
+        "Use a queue and visited set.",
+        "Track depth by BFS levels."
+      ],
+      "rules": {
+        "maxHintLevel": 3,
+        "guidanceStyle": "socratic"
+      },
+      "resources": [
+        "https://docs.oracle.com/javase/tutorial/essential/concurrency/"
+      ],
       "examples": [
         "Edges: [[1,2],[2,3],[3,4]], start=1, target=4 -> 3",
         "Edges: [[1,2],[1,3],[2,4],[3,4]], start=2, target=3 -> 2",
@@ -65,19 +169,69 @@
       "id": 24,
       "title": "Longest Increasing Subsequence",
       "level": "advanced",
-      "tags": ["dp", "arrays"],
+      "tags": [
+        "dp",
+        "arrays"
+      ],
       "details": "Implement `solve(int[] values)` and return the length of the longest strictly increasing subsequence.",
       "methodContract": "int solve(int[] values)",
       "explanation": "Use dynamic programming.",
       "starterCode": "public class Solution {\n    public int solve(int[] values) {\n        return 0;\n    }\n}\n",
       "testCases": [
-        {"name": "solve", "input": [[10, 9, 2, 5, 3, 7, 101, 18]], "expected": 4},
-        {"name": "solve", "input": [[0, 1, 0, 3, 2, 3]], "expected": 4},
-        {"name": "solve", "input": [[7, 7, 7, 7]], "expected": 1}
+        {
+          "name": "solve",
+          "input": [
+            [
+              10,
+              9,
+              2,
+              5,
+              3,
+              7,
+              101,
+              18
+            ]
+          ],
+          "expected": 4
+        },
+        {
+          "name": "solve",
+          "input": [
+            [
+              0,
+              1,
+              0,
+              3,
+              2,
+              3
+            ]
+          ],
+          "expected": 4
+        },
+        {
+          "name": "solve",
+          "input": [
+            [
+              7,
+              7,
+              7,
+              7
+            ]
+          ],
+          "expected": 1
+        }
       ],
-      "hints": ["Start with O(n^2) DP for each ending index.", "Consider best subsequence ending at each position."],
-      "rules": {"maxHintLevel": 3, "guidanceStyle": "socratic"},
-      "resources": ["https://en.wikipedia.org/wiki/Longest_increasing_subsequence"],
+      "hints": [
+        "Start with O(n^2) DP for each ending index.",
+        "Consider best subsequence ending at each position."
+      ],
+      "rules": {
+        "maxHintLevel": 3,
+        "guidanceStyle": "socratic"
+      },
+      "resources": [
+        "https://en.wikipedia.org/wiki/Longest_increasing_subsequence"
+      ],
       "examples": [
         "Input: [10, 9, 2, 5, 3, 7, 101, 18] -> Output: 4",
         "Input: [0, 1, 0, 3, 2, 3] -> Output: 4",

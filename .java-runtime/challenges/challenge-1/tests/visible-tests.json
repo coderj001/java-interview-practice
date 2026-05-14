@@ -1,0 +1,26 @@
+[
+  {
+    "name": "solve",
+    "input": [
+      2,
+      3
+    ],
+    "expected": 5
+  },
+  {
+    "name": "solve",
+    "input": [
+      -4,
+      10
+    ],
+    "expected": 6
+  },
+  {
+    "name": "solve",
+    "input": [
+      0,
+      0
+    ],
+    "expected": 0
+  }
+]

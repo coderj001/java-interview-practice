@@ -1,5 +1,8 @@
-## ADDED Requirements
+# ai-system-prompt Specification
 
+## Purpose
+TBD - created by archiving change ui-redesign-home-workspace. Update Purpose after archive.
+## Requirements
 ### Requirement: Global system prompt file
 The server SHALL load a `system-prompt.md` file from the project root at startup and use its content as the system message in all AI hint and review API calls.
 
@@ -28,3 +31,4 @@ The `challenges.json` file SHALL have a top-level `systemPrompt` field containin
 #### Scenario: Custom system prompt path
 - **WHEN** challenges.json has `"systemPrompt": "system-prompt.md"`
 - **THEN** the server reads `system-prompt.md` relative to the project root
+

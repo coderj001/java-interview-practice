@@ -1,5 +1,8 @@
-## ADDED Requirements
+# challenge-data-consolidation Specification
 
+## Purpose
+TBD - created by archiving change ui-redesign-home-workspace. Update Purpose after archive.
+## Requirements
 ### Requirement: Single challenges.json as data source
 The server SHALL read all challenge data from a single `challenges.json` file at the project root. This file contains an array of challenge objects with all metadata, inline markdown details, starter code, test cases, hints, rules, notes, and scoring fields.
 
@@ -32,3 +35,4 @@ The server SHALL write back to `challenges.json` when notes, scores, time, or st
 #### Scenario: Score update after submission
 - **WHEN** a user submits a passing solution for challenge id 1
 - **THEN** the server updates `bestScore`, `attempts`, `status`, and `completedAt` in `challenges.json`
+

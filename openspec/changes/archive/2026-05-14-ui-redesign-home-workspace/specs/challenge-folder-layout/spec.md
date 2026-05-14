@@ -1,7 +1,5 @@
-## Purpose
+## MODIFIED Requirements
 
-TBD
-## Requirements
 ### Requirement: Per-challenge content lives in a dedicated challenge folder
 The system MUST store canonical challenge content in the root `challenges.json` file and generate runtime challenge folders under `.java-runtime/challenges/challenge-<id>/` for Java compilation and test execution.
 
@@ -23,4 +21,3 @@ Each runtime challenge directory under `.java-runtime/challenges/challenge-<id>/
 #### Scenario: Authored content remains in consolidated source
 - **WHEN** challenge prompt/details, hints, rules, or metadata are authored
 - **THEN** those fields MUST be maintained in `challenges.json` rather than per-challenge source directories
-

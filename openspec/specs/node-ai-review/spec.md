@@ -1,26 +1,24 @@
 ## Purpose
 
 TBD
-
 ## Requirements
-
 ### Requirement: AI review via Gemini
-The system SHALL call the Gemini `generateContent` API with a prompt containing the challenge title, method contract, challenge prompt, and user's source code when the Gemini provider is selected and `GEMINI_API_KEY` is set.
+The system SHALL call the Gemini `generateContent` API with the global system prompt from `system-prompt.md`, the challenge title, method contract, challenge details, and user's source code when the Gemini provider is selected and `GEMINI_API_KEY` is set.
 
-#### Scenario: Successful Gemini review
+#### Scenario: Successful Gemini review with system prompt
 - **WHEN** a POST to `/api/challenges/:id/review` is made with `provider=gemini` and `GEMINI_API_KEY` is configured
-- **THEN** the server calls `https://generativelanguage.googleapis.com` and returns `{ provider, qualityAssessment, improvementSuggestion, followUpQuestions }` with real AI content
+- **THEN** the server includes the global system prompt in the Gemini API call and returns `{ provider, qualityAssessment, improvementSuggestion, followUpQuestions }`
 
 #### Scenario: Gemini key not configured
 - **WHEN** a POST to `/api/challenges/:id/review` is made with `provider=gemini` and `GEMINI_API_KEY` is not set
 - **THEN** the server returns HTTP 503 with `{ error: "Provider not available: gemini" }`
 
 ### Requirement: AI review via OpenRouter
-The system SHALL call the OpenRouter `chat/completions` endpoint with a system prompt and user message when the OpenRouter provider is selected and `OPENROUTER_API_KEY` is set.
+The system SHALL call the OpenRouter `chat/completions` endpoint with the global system prompt and user message when the OpenRouter provider is selected and `OPENROUTER_API_KEY` is set.
 
-#### Scenario: Successful OpenRouter review
+#### Scenario: Successful OpenRouter review with system prompt
 - **WHEN** a POST to `/api/challenges/:id/review` is made with `provider=openrouter` and `OPENROUTER_API_KEY` is configured
-- **THEN** the server calls `https://openrouter.ai/api/v1/chat/completions` using the configured or default model and returns `{ provider, qualityAssessment, improvementSuggestion, followUpQuestions }` with real AI content
+- **THEN** the server includes the global system prompt in the OpenRouter call and returns `{ provider, qualityAssessment, improvementSuggestion, followUpQuestions }`
 
 #### Scenario: OpenRouter model override
 - **WHEN** `OPENROUTER_MODEL` env var is set
@@ -36,3 +34,4 @@ The system SHALL return the same JSON shape for review regardless of provider, m
 #### Scenario: Response shape preserved
 - **WHEN** a successful review response is returned from any provider
 - **THEN** the JSON contains exactly: `provider` (string), `qualityAssessment` (string), `improvementSuggestion` (string), `followUpQuestions` (array of strings)
+
