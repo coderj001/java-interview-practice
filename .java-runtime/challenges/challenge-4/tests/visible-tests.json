@@ -1,6 +1,6 @@
 [
   {
-    "name": "solve",
+    "name": "linear chain start-to-end",
     "input": [
       [
         [
@@ -22,7 +22,7 @@
     "expected": 3
   },
   {
-    "name": "solve",
+    "name": "diamond graph shorter route",
     "input": [
       [
         [
@@ -48,7 +48,7 @@
     "expected": 2
   },
   {
-    "name": "solve",
+    "name": "disconnected nodes return -1",
     "input": [
       [
         [
@@ -60,5 +60,63 @@
       3
     ],
     "expected": -1
+  },
+  {
+    "name": "start equals target",
+    "input": [
+      [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      2,
+      2
+    ],
+    "expected": 0
+  },
+  {
+    "name": "single edge direct hop",
+    "input": [
+      [
+        [
+          5,
+          9
+        ]
+      ],
+      5,
+      9
+    ],
+    "expected": 1
+  },
+  {
+    "name": "star topology",
+    "input": [
+      [
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          5
+        ]
+      ],
+      2,
+      5
+    ],
+    "expected": 2
   }
 ]

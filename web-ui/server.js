@@ -14,10 +14,17 @@ const { createSolutionStore } = require("./src/node/solution-store");
 const { createLeaderboardStore } = require("./src/node/leaderboard-store");
 const { buildGitGuidance } = require("./src/node/git-guidance");
 const { normalizeChallengeId, normalizeUserId } = require("./src/node/validation");
+const { createInterviewSessionStore } = require("./src/node/interview-session-store");
 
 const app = express();
 const port = Number.parseInt(process.env.PORT || "3000", 10);
 const repoRoot = path.resolve(__dirname, "..");
+const runnableChallengeIds = new Set(
+  String(process.env.SANDBOX_RUNNABLE_CHALLENGE_IDS || "1,4,24")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+);
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -30,6 +37,7 @@ ensureJavaRuntimeCompiled();
 
 const solutionStore = createSolutionStore(path.join(runtimeChallengesRoot));
 const leaderboard = createLeaderboardStore();
+const interviewSessions = createInterviewSessionStore();
 
 app.get("/", (_req, res) => {
   const challenges = listChallenges();
@@ -163,6 +171,143 @@ app.get("/api/leaderboard", (_req, res) => {
   res.json({ entries: leaderboard.top() });
 });
 
+app.post("/api/interview-sessions", (req, res) => {
+  try {
+    const interviewerId = String(req.body.interviewerId || "interviewer");
+    const intervieweeId = String(req.body.intervieweeId || "interviewee");
+    const durationMs = Math.max(0, Number.parseInt(String(req.body.durationMs || "2700000"), 10) || 0);
+    const challengeId = resolveSessionChallengeId(req.body.challengeId);
+    const challenge = challengeById(challengeId);
+    const session = interviewSessions.createSession({
+      interviewerId,
+      intervieweeId,
+      durationMs,
+      challenge: {
+        id: challengeId,
+        title: challenge.title,
+        details: challenge.details,
+        starterCode: challenge.starterCode
+      }
+    });
+    res.status(201).json(session);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/interviewer/:sessionId", (req, res) => {
+  res.render("interviewer", {
+    pageStateJson: JSON.stringify({ sessionId: String(req.params.sessionId || ""), role: "interviewer" })
+  });
+});
+
+app.get("/interviewee/:sessionId", (req, res) => {
+  res.render("interviewee", {
+    pageStateJson: JSON.stringify({ sessionId: String(req.params.sessionId || ""), role: "interviewee" })
+  });
+});
+
+app.get("/api/interview-sessions/:sessionId/state", (req, res) => {
+  const session = interviewSessions.getSession(req.params.sessionId);
+  if (!session) return res.status(404).json({ error: `Unknown session: ${req.params.sessionId}` });
+  return res.json(interviewSessions.snapshot(session));
+});
+
+app.post("/api/interview-sessions/:sessionId/challenge", (req, res) => {
+  try {
+    const actorId = String(req.get("x-actor-id") || req.body.actorId || "");
+    const challengeId = requireRunnableChallengeId(req.body.challengeId);
+    const challenge = challengeById(challengeId);
+    const snapshot = interviewSessions.assignChallenge({
+      sessionId: req.params.sessionId,
+      actorId,
+      challenge: {
+        id: challengeId,
+        title: challenge.title,
+        details: challenge.details,
+        starterCode: challenge.starterCode
+      }
+    });
+    res.json(snapshot);
+  } catch (error) {
+    res.status(error.code || 400).json({ error: error.message });
+  }
+});
+
+app.get("/api/interview-sessions/:sessionId/challenges", (req, res) => {
+  const session = interviewSessions.getSession(req.params.sessionId);
+  if (!session) return res.status(404).json({ error: `Unknown session: ${req.params.sessionId}` });
+  return res.json({
+    challenges: listChallenges()
+      .filter((challenge) => runnableChallengeIds.has(String(challenge.id)))
+      .map((challenge) => ({ id: String(challenge.id), title: challenge.title }))
+  });
+});
+
+app.post("/api/interview-sessions/:sessionId/timer/start", (req, res) => mutateTimer(req, res, "start"));
+app.post("/api/interview-sessions/:sessionId/timer/pause", (req, res) => mutateTimer(req, res, "pause"));
+app.post("/api/interview-sessions/:sessionId/timer/resume", (req, res) => mutateTimer(req, res, "resume"));
+app.post("/api/interview-sessions/:sessionId/timer/end", (req, res) => mutateTimer(req, res, "end"));
+app.post("/api/interview-sessions/:sessionId/timer/adjust", (req, res) => mutateTimer(req, res, "adjust"));
+
+app.post("/api/interview-sessions/:sessionId/submissions", async (req, res) => {
+  try {
+    const session = interviewSessions.getSession(req.params.sessionId);
+    if (!session) return res.status(404).json({ error: `Unknown session: ${req.params.sessionId}` });
+    const actorId = String(req.get("x-actor-id") || req.body.actorId || "");
+    const challengeId = String(session.challenge.id || "");
+    const code = String(req.body.code || "");
+    const evaluation = await evaluateChallenge(challengeId, code);
+    const status = Number(evaluation.correctnessPoints || 0) === 100 ? "passed" : "failed";
+    const submission = interviewSessions.addSubmission({
+      sessionId: req.params.sessionId,
+      actorId,
+      challengeId,
+      code,
+      output: evaluation,
+      status
+    });
+    res.status(201).json({ submission, evaluation });
+  } catch (error) {
+    res.status(error.code || 400).json({ error: error.message });
+  }
+});
+
+app.get("/api/interview-sessions/:sessionId/submissions", (req, res) => {
+  try {
+    const actorId = String(req.get("x-actor-id") || req.query.actorId || "");
+    const submissions = interviewSessions.listSubmissions({
+      sessionId: req.params.sessionId,
+      actorId
+    });
+    res.json({ submissions });
+  } catch (error) {
+    res.status(error.code || 400).json({ error: error.message });
+  }
+});
+
+app.get("/api/interview-sessions/:sessionId/events", (req, res) => {
+  const session = interviewSessions.getSession(req.params.sessionId);
+  if (!session) return res.status(404).json({ error: `Unknown session: ${req.params.sessionId}` });
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  res.write(`event: session.snapshot\n`);
+  res.write(`data: ${JSON.stringify(interviewSessions.snapshot(session))}\n\n`);
+
+  const unsubscribe = interviewSessions.subscribe(req.params.sessionId, (event) => {
+    res.write(`event: timer.${event.timerState}\n`);
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  });
+
+  req.on("close", () => {
+    unsubscribe();
+    res.end();
+  });
+});
+
 app.listen(port, () => {
   const configuredPrompt = loadChallengesFile().systemPrompt;
   process.stdout.write(`Java Interview Practice UI running at http://localhost:${port} (system prompt: ${configuredPrompt})\n`);
@@ -172,4 +317,52 @@ function requireChallengeId(rawChallengeId) {
   const challengeId = normalizeChallengeId(rawChallengeId);
   if (!challengeById(challengeId)) throw new Error(`Unknown challenge: ${challengeId}`);
   return challengeId;
+}
+
+function requireSessionChallengeId(rawChallengeId) {
+  if (rawChallengeId === undefined || rawChallengeId === null || String(rawChallengeId).trim() === "") {
+    throw new Error("Missing challengeId");
+  }
+  return requireChallengeId(rawChallengeId);
+}
+
+function resolveSessionChallengeId(rawChallengeId) {
+  if (rawChallengeId !== undefined && rawChallengeId !== null && String(rawChallengeId).trim() !== "") {
+    return requireRunnableChallengeId(rawChallengeId);
+  }
+
+  const first = listChallenges().find((challenge) => runnableChallengeIds.has(String(challenge.id)));
+  if (!first) throw new Error("No challenges available");
+  return requireChallengeId(first.id);
+}
+
+function requireRunnableChallengeId(rawChallengeId) {
+  const challengeId = requireChallengeId(rawChallengeId);
+  if (!runnableChallengeIds.has(String(challengeId))) {
+    throw new Error(
+      `Challenge ${challengeId} is not runnable in current sandbox runtime. Supported: ${Array.from(runnableChallengeIds).join(", ")}`
+    );
+  }
+  return challengeId;
+}
+
+function mutateTimer(req, res, action) {
+  try {
+    const actorId = String(req.get("x-actor-id") || req.body.actorId || "");
+    const expectedVersion = Number.parseInt(String(req.body.expectedVersion ?? "-1"), 10);
+    const deltaMs = Number.parseInt(String(req.body.deltaMs || "0"), 10) || 0;
+    const result = interviewSessions.mutateTimer({
+      sessionId: req.params.sessionId,
+      actorId,
+      action,
+      expectedVersion,
+      deltaMs
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(error.code || 400).json({
+      error: error.message,
+      ...(error.currentVersion !== undefined ? { currentVersion: error.currentVersion } : {})
+    });
+  }
 }

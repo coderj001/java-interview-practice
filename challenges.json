@@ -15,7 +15,7 @@
       "starterCode": "public class Solution {\n    public int solve(int a, int b) {\n        return a + b;\n    }\n}\n",
       "testCases": [
         {
-          "name": "solve",
+          "name": "adds positive numbers",
           "input": [
             2,
             3
@@ -23,7 +23,7 @@
           "expected": 5
         },
         {
-          "name": "solve",
+          "name": "handles negative addend",
           "input": [
             -4,
             10
@@ -31,14 +31,38 @@
           "expected": 6
         },
         {
-          "name": "solve",
+          "name": "both zeros",
           "input": [
             0,
             0
           ],
           "expected": 0
+        },
+        {
+          "name": "large positive values",
+          "input": [
+            1000000,
+            999999
+          ],
+          "expected": 1999999
+        },
+        {
+          "name": "both negative",
+          "input": [
+            -7,
+            -3
+          ],
+          "expected": -10
         }
       ],
+      "sandboxProfile": {
+        "mode": "reflective",
+        "timeoutMs": 3000
+      },
+      "aiTestConfig": {
+        "promptTemplate": "You are a Java coding challenge assistant. Generate {count} additional test cases for the method `{methodContract}`. The method should return the sum of its two integer arguments. Edge cases to explore: integer overflow boundaries, very large negatives, mixing zero with positives or negatives.\n\nExisting examples for reference:\n{examples}\n\nRespond ONLY with a JSON array. Each element must have: \"name\" (string), \"input\" ([int, int]), \"expected\" (int).",
+        "defaultCount": 3
+      },
       "hints": [
         "Think about Java integer addition.",
         "The `+` operator on two ints gives the sum."
@@ -58,9 +82,9 @@
       "notes": "",
       "score": 100,
       "bestScore": 100,
-      "attempts": 2,
+      "attempts": 3,
       "timeSpentMs": 114869,
-      "completedAt": "2026-05-14T19:23:42.275Z",
+      "completedAt": "2026-05-14T20:08:52.318Z",
       "status": "completed"
     },
     {
@@ -78,7 +102,7 @@
       "starterCode": "public class Solution {\n    public int solve(int[][] edges, int start, int target) {\n        return -1;\n    }\n}\n",
       "testCases": [
         {
-          "name": "solve",
+          "name": "linear chain start-to-end",
           "input": [
             [
               [
@@ -100,7 +124,7 @@
           "expected": 3
         },
         {
-          "name": "solve",
+          "name": "diamond graph shorter route",
           "input": [
             [
               [
@@ -126,7 +150,7 @@
           "expected": 2
         },
         {
-          "name": "solve",
+          "name": "disconnected nodes return -1",
           "input": [
             [
               [
@@ -138,8 +162,74 @@
             3
           ],
           "expected": -1
+        },
+        {
+          "name": "start equals target",
+          "input": [
+            [
+              [
+                1,
+                2
+              ],
+              [
+                2,
+                3
+              ]
+            ],
+            2,
+            2
+          ],
+          "expected": 0
+        },
+        {
+          "name": "single edge direct hop",
+          "input": [
+            [
+              [
+                5,
+                9
+              ]
+            ],
+            5,
+            9
+          ],
+          "expected": 1
+        },
+        {
+          "name": "star topology",
+          "input": [
+            [
+              [
+                1,
+                2
+              ],
+              [
+                1,
+                3
+              ],
+              [
+                1,
+                4
+              ],
+              [
+                1,
+                5
+              ]
+            ],
+            2,
+            5
+          ],
+          "expected": 2
         }
       ],
+      "sandboxProfile": {
+        "mode": "reflective",
+        "timeoutMs": 4000
+      },
+      "aiTestConfig": {
+        "promptTemplate": "You are a Java coding challenge assistant. Generate {count} additional test cases for `{methodContract}`. The method finds the shortest hop count (BFS) between `start` and `target` in an undirected graph represented as an edge list. Return -1 if unreachable.\n\nExplore: cyclic graphs, self-loops, single-node graphs, highly connected graphs, long linear chains.\n\nExisting examples:\n{examples}\n\nRespond ONLY with a JSON array. Each element: \"name\" (string), \"input\" ([int[][], int, int]), \"expected\" (int).",
+        "defaultCount": 3
+      },
       "hints": [
         "Build adjacency from edges first.",
         "Use a queue and visited set.",
@@ -161,9 +251,204 @@
       "score": 33,
       "bestScore": 33,
       "attempts": 1,
-      "timeSpentMs": 0,
+      "timeSpentMs": 678427,
       "completedAt": null,
       "status": "in-progress"
+    },
+    {
+      "id": 5,
+      "title": "Token Bucket Rate Limiter",
+      "level": "advanced",
+      "tags": [
+        "concurrency",
+        "design",
+        "rate-limiting"
+      ],
+      "details": "Implement a thread-safe token bucket rate limiter. Your `Solution` class must have a constructor `Solution(int capacity, int refillPerSecond)` and a method `boolean acquire()` that returns `true` if a token was available and consumed, or `false` if the bucket is empty. The bucket refills at `refillPerSecond` tokens every second. The limiter must be safe for concurrent access from multiple threads.",
+      "methodContract": "boolean acquire()",
+      "explanation": "Use a token bucket algorithm with a capacity ceiling and time-based refill. Protect shared state with locks or atomic operations.",
+      "starterCode": "public class Solution {\n    private final int capacity;\n    private final int refillPerSecond;\n    // TODO: add state fields\n\n    public Solution(int capacity, int refillPerSecond) {\n        this.capacity = capacity;\n        this.refillPerSecond = refillPerSecond;\n    }\n\n    public boolean acquire() {\n        // TODO: implement token bucket logic\n        return false;\n    }\n}\n",
+      "testCases": [
+        {
+          "name": "quota respected under concurrent load",
+          "concurrentThreads": 20,
+          "callsPerThread": 1,
+          "constructorArgs": [
+            10,
+            1
+          ],
+          "expected": {
+            "minAccepted": 10,
+            "maxAccepted": 10,
+            "maxRejected": 10,
+            "expectNoExceptions": true
+          }
+        },
+        {
+          "name": "no tokens rejected when capacity large enough",
+          "concurrentThreads": 5,
+          "callsPerThread": 1,
+          "constructorArgs": [
+            10,
+            1
+          ],
+          "expected": {
+            "minAccepted": 5,
+            "maxAccepted": 5,
+            "maxRejected": 0,
+            "expectNoExceptions": true
+          }
+        },
+        {
+          "name": "fully exhausted bucket rejects all",
+          "concurrentThreads": 1,
+          "callsPerThread": 15,
+          "constructorArgs": [
+            5,
+            0
+          ],
+          "expected": {
+            "minAccepted": 5,
+            "maxAccepted": 5,
+            "maxRejected": 10,
+            "expectNoExceptions": true
+          }
+        },
+        {
+          "name": "no data races under high concurrency",
+          "concurrentThreads": 50,
+          "callsPerThread": 1,
+          "constructorArgs": [
+            25,
+            0
+          ],
+          "expected": {
+            "minAccepted": 25,
+            "maxAccepted": 25,
+            "maxRejected": 25,
+            "expectNoExceptions": true
+          }
+        }
+      ],
+      "sandboxProfile": {
+        "mode": "concurrent",
+        "timeoutMs": 8000
+      },
+      "aiTestConfig": {
+        "promptTemplate": "You are a Java coding challenge assistant. Generate {count} additional concurrent test cases for a thread-safe token bucket rate limiter with constructor `Solution(int capacity, int refillPerSecond)` and method `{methodContract}`.\n\nEach test case must include: concurrentThreads, callsPerThread, constructorArgs ([capacity, refillPerSecond]), and expected thresholds (minAccepted, maxAccepted, maxRejected, expectNoExceptions).\n\nExplore: single-thread correctness, many threads few tokens, capacity=0, rapid repeated calls, burst then drain.\n\nExisting examples:\n{examples}\n\nRespond ONLY with a JSON array. Each element: \"name\" (string), \"concurrentThreads\" (int), \"callsPerThread\" (int), \"constructorArgs\" ([int, int]), \"expected\" ({minAccepted, maxAccepted, maxRejected, expectNoExceptions}).",
+        "defaultCount": 3
+      },
+      "hints": [
+        "What shared state does a token bucket need? (current tokens, last refill timestamp)",
+        "How do you prevent two threads from consuming the same token? Think `synchronized` or `AtomicInteger`.",
+        "Refill logic: calculate elapsed time since last acquire, add (elapsed * refillPerSecond) tokens, cap at capacity."
+      ],
+      "rules": {
+        "maxHintLevel": 4,
+        "guidanceStyle": "socratic"
+      },
+      "resources": [
+        "https://docs.oracle.com/javase/tutorial/essential/concurrency/sync.html",
+        "https://en.wikipedia.org/wiki/Token_bucket"
+      ],
+      "examples": [
+        "capacity=10, 20 threads call acquire() once each -> 10 accepted, 10 rejected",
+        "capacity=10, 5 threads call acquire() once each -> 5 accepted, 0 rejected",
+        "capacity=5, refill=0, 1 thread calls 15 times -> 5 accepted, 10 rejected"
+      ],
+      "notes": "This challenge tests thread safety. A correct but non-thread-safe implementation will fail the high-concurrency test.",
+      "score": null,
+      "bestScore": 0,
+      "attempts": 0,
+      "timeSpentMs": 0,
+      "completedAt": null,
+      "status": "not-started"
+    },
+    {
+      "id": 6,
+      "title": "User Table CRUD with JDBC",
+      "level": "intermediate",
+      "tags": [
+        "sql",
+        "jdbc",
+        "database"
+      ],
+      "details": "You are given a pre-created `users` table with columns `id INTEGER PRIMARY KEY`, `name VARCHAR(100)`, `email VARCHAR(200)`, and `active BOOLEAN`. Write a series of SQL statements inside the `solve()` method body that: (1) insert three users, (2) update one user's email, and (3) delete all inactive users. The harness will assert the final state of the table.",
+      "methodContract": "void solve(java.sql.Connection conn) throws java.sql.SQLException",
+      "explanation": "Use standard JDBC `Statement.execute()` or `PreparedStatement`. The connection is auto-committed after your method returns.",
+      "starterCode": "import java.sql.Connection;\nimport java.sql.SQLException;\nimport java.sql.Statement;\n\npublic class Solution {\n    public void solve(Connection conn) throws SQLException {\n        try (Statement stmt = conn.createStatement()) {\n            // 1. Insert three users\n            // stmt.execute(\"INSERT INTO users VALUES (...)\");\n\n            // 2. Update alice@example.com -> alice@company.com\n            // stmt.execute(\"UPDATE users SET email = ... WHERE name = 'Alice'\");\n\n            // 3. Delete inactive users\n            // stmt.execute(\"DELETE FROM users WHERE active = FALSE\");\n        }\n    }\n}\n",
+      "testCases": [
+        {
+          "name": "correct row count after inserts",
+          "assertTable": "users",
+          "expectedRowCount": 2,
+          "description": "After inserting 3 users and deleting inactive ones, exactly 2 active users should remain."
+        },
+        {
+          "name": "Alice email updated",
+          "assertTable": "users",
+          "assertQuery": "SELECT email FROM users WHERE name = 'Alice'",
+          "expectedSingleValue": "alice@company.com",
+          "description": "Alice's email should be updated to alice@company.com."
+        },
+        {
+          "name": "no inactive users remain",
+          "assertTable": "users",
+          "assertQuery": "SELECT COUNT(*) FROM users WHERE active = FALSE",
+          "expectedSingleValue": 0,
+          "description": "All inactive users must have been deleted."
+        },
+        {
+          "name": "active users have correct emails",
+          "assertTable": "users",
+          "assertQuery": "SELECT name, email FROM users WHERE active = TRUE ORDER BY name",
+          "expectedRows": [
+            {
+              "name": "Alice",
+              "email": "alice@company.com"
+            },
+            {
+              "name": "Bob",
+              "email": "bob@example.com"
+            }
+          ],
+          "description": "The two remaining active users are Alice (with updated email) and Bob."
+        }
+      ],
+      "sandboxProfile": {
+        "mode": "sql",
+        "timeoutMs": 6000,
+        "setup": "CREATE TABLE users (id INTEGER PRIMARY KEY, name VARCHAR(100) NOT NULL, email VARCHAR(200) NOT NULL, active BOOLEAN NOT NULL);"
+      },
+      "aiTestConfig": {
+        "promptTemplate": "You are a Java coding challenge assistant. Generate {count} additional SQL assertion test cases for a JDBC challenge. The `users` table has columns: id (INTEGER PK), name (VARCHAR), email (VARCHAR), active (BOOLEAN). The user must insert Alice (active), Bob (active), and Charlie (inactive), then update Alice's email to alice@company.com, then delete inactive users.\n\nEach test case must assert some aspect of the final table state using assertQuery + expectedSingleValue or expectedRows.\n\nExisting tests:\n{examples}\n\nRespond ONLY with a JSON array. Each element: \"name\" (string), \"assertTable\" (string), optionally \"assertQuery\" (SQL string), \"expectedSingleValue\" or \"expectedRows\", \"description\" (string).",
+        "defaultCount": 2
+      },
+      "hints": [
+        "Your INSERT statements need four values: id, name, email, active. Use TRUE/FALSE for the boolean.",
+        "The UPDATE must target Alice specifically — use a WHERE clause on name or id.",
+        "DELETE WHERE active = FALSE will remove all users who are not active."
+      ],
+      "rules": {
+        "maxHintLevel": 4,
+        "guidanceStyle": "socratic"
+      },
+      "resources": [
+        "https://docs.oracle.com/javase/tutorial/jdbc/basics/index.html",
+        "https://www.h2database.com/html/grammar.html"
+      ],
+      "examples": [
+        "After solve(): users table has 2 rows (Alice active, Bob active)",
+        "Alice's email = 'alice@company.com'",
+        "SELECT COUNT(*) FROM users WHERE active = FALSE -> 0"
+      ],
+      "notes": "The table schema is created for you by the test harness before your code runs. Do not CREATE TABLE — just INSERT, UPDATE, DELETE.",
+      "score": null,
+      "bestScore": 0,
+      "attempts": 0,
+      "timeSpentMs": 0,
+      "completedAt": null,
+      "status": "not-started"
     },
     {
       "id": 24,
@@ -179,7 +464,7 @@
       "starterCode": "public class Solution {\n    public int solve(int[] values) {\n        return 0;\n    }\n}\n",
       "testCases": [
         {
-          "name": "solve",
+          "name": "classic LIS example",
           "input": [
             [
               10,
@@ -195,7 +480,7 @@
           "expected": 4
         },
         {
-          "name": "solve",
+          "name": "repeated pivots with two paths",
           "input": [
             [
               0,
@@ -209,7 +494,7 @@
           "expected": 4
         },
         {
-          "name": "solve",
+          "name": "all equal values",
           "input": [
             [
               7,
@@ -219,8 +504,65 @@
             ]
           ],
           "expected": 1
+        },
+        {
+          "name": "already sorted ascending",
+          "input": [
+            [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          ],
+          "expected": 5
+        },
+        {
+          "name": "strictly descending",
+          "input": [
+            [
+              9,
+              8,
+              7,
+              6,
+              5
+            ]
+          ],
+          "expected": 1
+        },
+        {
+          "name": "single element",
+          "input": [
+            [
+              42
+            ]
+          ],
+          "expected": 1
+        },
+        {
+          "name": "alternating zigzag",
+          "input": [
+            [
+              1,
+              3,
+              2,
+              4,
+              3,
+              5
+            ]
+          ],
+          "expected": 4
         }
       ],
+      "sandboxProfile": {
+        "mode": "reflective",
+        "timeoutMs": 4000
+      },
+      "aiTestConfig": {
+        "promptTemplate": "You are a Java coding challenge assistant. Generate {count} additional test cases for `{methodContract}`. The method returns the length of the longest STRICTLY increasing subsequence. Edge cases: empty-like arrays, duplicate runs, interleaved ascending/descending, very long constant sequences.\n\nExisting examples:\n{examples}\n\nRespond ONLY with a JSON array. Each element: \"name\" (string), \"input\" ([int[]]), \"expected\" (int).",
+        "defaultCount": 3
+      },
       "hints": [
         "Start with O(n^2) DP for each ending index.",
         "Consider best subsequence ending at each position."

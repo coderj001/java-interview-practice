@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interviewer Console</title>
+  <link rel="stylesheet" href="/public/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="top-bar">
+      <h1>Interviewer Console</h1>
+      <div class="top-controls"><input id="actor-id" type="text" value="interviewer" aria-label="actor"></div>
+    </header>
+    <main id="session-app" class="panel"></main>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>window.__SESSION_PAGE__ = <%- pageStateJson %>;</script>
+  <script src="/public/interview-session.js"></script>
+</body>
+</html>

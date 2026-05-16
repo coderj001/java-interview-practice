@@ -1,6 +1,6 @@
 [
   {
-    "name": "solve",
+    "name": "classic LIS example",
     "input": [
       [
         10,
@@ -16,7 +16,7 @@
     "expected": 4
   },
   {
-    "name": "solve",
+    "name": "repeated pivots with two paths",
     "input": [
       [
         0,
@@ -30,7 +30,7 @@
     "expected": 4
   },
   {
-    "name": "solve",
+    "name": "all equal values",
     "input": [
       [
         7,
@@ -40,5 +40,54 @@
       ]
     ],
     "expected": 1
+  },
+  {
+    "name": "already sorted ascending",
+    "input": [
+      [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    ],
+    "expected": 5
+  },
+  {
+    "name": "strictly descending",
+    "input": [
+      [
+        9,
+        8,
+        7,
+        6,
+        5
+      ]
+    ],
+    "expected": 1
+  },
+  {
+    "name": "single element",
+    "input": [
+      [
+        42
+      ]
+    ],
+    "expected": 1
+  },
+  {
+    "name": "alternating zigzag",
+    "input": [
+      [
+        1,
+        3,
+        2,
+        4,
+        3,
+        5
+      ]
+    ],
+    "expected": 4
   }
 ]

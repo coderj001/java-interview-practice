@@ -1,0 +1,38 @@
+[
+  {
+    "name": "correct row count after inserts",
+    "assertTable": "users",
+    "expectedRowCount": 2,
+    "description": "After inserting 3 users and deleting inactive ones, exactly 2 active users should remain."
+  },
+  {
+    "name": "Alice email updated",
+    "assertTable": "users",
+    "assertQuery": "SELECT email FROM users WHERE name = 'Alice'",
+    "expectedSingleValue": "alice@company.com",
+    "description": "Alice's email should be updated to alice@company.com."
+  },
+  {
+    "name": "no inactive users remain",
+    "assertTable": "users",
+    "assertQuery": "SELECT COUNT(*) FROM users WHERE active = FALSE",
+    "expectedSingleValue": 0,
+    "description": "All inactive users must have been deleted."
+  },
+  {
+    "name": "active users have correct emails",
+    "assertTable": "users",
+    "assertQuery": "SELECT name, email FROM users WHERE active = TRUE ORDER BY name",
+    "expectedRows": [
+      {
+        "name": "Alice",
+        "email": "alice@company.com"
+      },
+      {
+        "name": "Bob",
+        "email": "bob@example.com"
+      }
+    ],
+    "description": "The two remaining active users are Alice (with updated email) and Bob."
+  }
+]

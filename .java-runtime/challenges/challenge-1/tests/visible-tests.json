@@ -1,6 +1,6 @@
 [
   {
-    "name": "solve",
+    "name": "adds positive numbers",
     "input": [
       2,
       3
@@ -8,7 +8,7 @@
     "expected": 5
   },
   {
-    "name": "solve",
+    "name": "handles negative addend",
     "input": [
       -4,
       10
@@ -16,11 +16,27 @@
     "expected": 6
   },
   {
-    "name": "solve",
+    "name": "both zeros",
     "input": [
       0,
       0
     ],
     "expected": 0
+  },
+  {
+    "name": "large positive values",
+    "input": [
+      1000000,
+      999999
+    ],
+    "expected": 1999999
+  },
+  {
+    "name": "both negative",
+    "input": [
+      -7,
+      -3
+    ],
+    "expected": -10
   }
 ]

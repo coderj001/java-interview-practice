@@ -1,0 +1,62 @@
+[
+  {
+    "name": "quota respected under concurrent load",
+    "concurrentThreads": 20,
+    "callsPerThread": 1,
+    "constructorArgs": [
+      10,
+      1
+    ],
+    "expected": {
+      "minAccepted": 10,
+      "maxAccepted": 10,
+      "maxRejected": 10,
+      "expectNoExceptions": true
+    }
+  },
+  {
+    "name": "no tokens rejected when capacity large enough",
+    "concurrentThreads": 5,
+    "callsPerThread": 1,
+    "constructorArgs": [
+      10,
+      1
+    ],
+    "expected": {
+      "minAccepted": 5,
+      "maxAccepted": 5,
+      "maxRejected": 0,
+      "expectNoExceptions": true
+    }
+  },
+  {
+    "name": "fully exhausted bucket rejects all",
+    "concurrentThreads": 1,
+    "callsPerThread": 15,
+    "constructorArgs": [
+      5,
+      0
+    ],
+    "expected": {
+      "minAccepted": 5,
+      "maxAccepted": 5,
+      "maxRejected": 10,
+      "expectNoExceptions": true
+    }
+  },
+  {
+    "name": "no data races under high concurrency",
+    "concurrentThreads": 50,
+    "callsPerThread": 1,
+    "constructorArgs": [
+      25,
+      0
+    ],
+    "expected": {
+      "minAccepted": 25,
+      "maxAccepted": 25,
+      "maxRejected": 25,
+      "expectNoExceptions": true
+    }
+  }
+]
