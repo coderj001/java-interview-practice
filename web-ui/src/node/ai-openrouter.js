@@ -1,5 +1,6 @@
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_MODEL = "deepseek/deepseek-coder-v2";
+const MAX_TEST_CONTEXT_CHARS = 4000;
 
 async function reviewCode(challenge, code, apiKey, model = DEFAULT_MODEL, systemPrompt) {
   const content = await callOpenRouter({
@@ -28,10 +29,12 @@ async function hintCode(challenge, code, level, apiKey, model = DEFAULT_MODEL, s
 }
 
 function buildReviewPrompt(challenge, code) {
+  const testsContext = buildTestsContext(challenge);
   return [
     "Challenge title:", "```text", challenge.title || "", "```", "",
     "Method contract:", "```text", challenge.methodContract || "", "```", "",
     "Challenge details:", "```text", challenge.details || "", "```", "",
+    ...(testsContext ? ["Visible tests:", "```json", testsContext, "```", ""] : []),
     "User code:", "```java", code || "", "```"
   ].join("\n");
 }
@@ -39,6 +42,7 @@ function buildReviewPrompt(challenge, code) {
 function buildHintPrompt(challenge, code, level) {
   const hintContext = Array.isArray(challenge.hints) ? challenge.hints.join("\n- ") : "";
   const guidanceStyle = challenge?.rules?.guidanceStyle || "socratic";
+  const testsContext = buildTestsContext(challenge);
   return [
     `Hint level: ${level}.`,
     `Guidance style: ${guidanceStyle}.`,
@@ -47,6 +51,7 @@ function buildHintPrompt(challenge, code, level) {
     "Challenge title:", "```text", challenge.title || "", "```", "",
     "Method contract:", "```text", challenge.methodContract || "", "```", "",
     "Challenge details:", "```text", challenge.details || "", "```", "",
+    ...(testsContext ? ["Visible tests:", "```json", testsContext, "```", ""] : []),
     "User code:", "```java", code || "", "```"
   ].join("\n");
 }
@@ -82,6 +87,14 @@ function asString(value) {
 
 function asStringArray(value) {
   return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+}
+
+function buildTestsContext(challenge) {
+  const tests = Array.isArray(challenge?.testCases) ? challenge.testCases : [];
+  if (!tests.length) return "";
+  const json = JSON.stringify(tests, null, 2);
+  if (json.length <= MAX_TEST_CONTEXT_CHARS) return json;
+  return `${json.slice(0, MAX_TEST_CONTEXT_CHARS)}\n/* truncated: test context too large */`;
 }
 
 module.exports = { reviewCode, hintCode, DEFAULT_MODEL };

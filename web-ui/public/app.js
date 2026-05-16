@@ -105,9 +105,11 @@ function renderFeedbackPane(challenge) {
     </div>
     <div class="feedback-body">
       <div id="feedback-tests" class="feedback-panel${state.activeFeedbackPanel === "tests" ? " active" : ""}">${state.lastTestResultHtml || "Ready."}</div>
-      <pre id="feedback-review" class="feedback-panel${state.activeFeedbackPanel === "review" ? " active" : ""}">${escapeHtml(formatJson(state.lastReviewPayload))}</pre>
-      <pre id="feedback-hint" class="feedback-panel${state.activeFeedbackPanel === "hint" ? " active" : ""}">${escapeHtml(formatJson(state.lastHintPayload))}</pre>
-      <textarea id="notes" class="feedback-panel${state.activeFeedbackPanel === "notes" ? " active" : ""}" placeholder="Your notes...">${escapeHtml(challenge.notes || "")}</textarea>
+      <div id="feedback-review" class="feedback-panel panel-content${state.activeFeedbackPanel === "review" ? " active" : ""}">${renderReviewPanel(state.lastReviewPayload)}</div>
+      <div id="feedback-hint" class="feedback-panel panel-content${state.activeFeedbackPanel === "hint" ? " active" : ""}">${renderHintPanel(state.lastHintPayload)}</div>
+      <div class="feedback-panel panel-content${state.activeFeedbackPanel === "notes" ? " active" : ""}">
+        <textarea id="notes" class="panel-notes" placeholder="Your notes...">${escapeHtml(challenge.notes || "")}</textarea>
+      </div>
     </div>
   </section>`;
 }
@@ -251,15 +253,36 @@ function renderFeedbackContent(challenge) {
   const tests = document.getElementById("feedback-tests");
   if (tests) tests.innerHTML = state.lastTestResultHtml || "Ready.";
   const review = document.getElementById("feedback-review");
-  if (review) review.textContent = formatJson(state.lastReviewPayload);
+  if (review) review.innerHTML = renderReviewPanel(state.lastReviewPayload);
   const hint = document.getElementById("feedback-hint");
-  if (hint) hint.textContent = formatJson(state.lastHintPayload);
+  if (hint) hint.innerHTML = renderHintPanel(state.lastHintPayload);
   const notes = document.getElementById("notes");
   if (notes && notes.value !== (challenge.notes || "")) notes.value = challenge.notes || "";
 }
 
 function formatJson(value) {
   return value ? JSON.stringify(value, null, 2) : "No data yet.";
+}
+
+function renderStructuredPanel(payload, emptyText) {
+  if (!payload) return `<div class="panel-empty">${escapeHtml(emptyText)}</div>`;
+  return `<div class="panel-section"><pre class="panel-pre">${escapeHtml(JSON.stringify(payload, null, 2))}</pre></div>`;
+}
+
+function renderReviewPanel(payload) {
+  if (!payload) return `<div class="panel-empty">No review yet.</div>`;
+  const questions = Array.isArray(payload.followUpQuestions) ? payload.followUpQuestions : [];
+  return [
+    `<section class="panel-section"><h4 class="panel-title">Quality Assessment</h4><p class="panel-text">${escapeHtml(payload.qualityAssessment || "N/A")}</p></section>`,
+    `<section class="panel-section"><h4 class="panel-title">Improvement Suggestion</h4><p class="panel-text">${escapeHtml(payload.improvementSuggestion || "N/A")}</p></section>`,
+    `<section class="panel-section"><h4 class="panel-title">Follow-up Questions</h4>${questions.length ? `<ul class="panel-list">${questions.map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul>` : `<p class="panel-text">No follow-up questions.</p>`}</section>`
+  ].join("");
+}
+
+function renderHintPanel(payload) {
+  if (!payload) return `<div class="panel-empty">No hints yet.</div>`;
+  const level = payload.level ? `Level ${escapeHtml(String(payload.level))}` : "Hint";
+  return `<section class="panel-section"><h4 class="panel-title">${level}</h4><p class="panel-text">${escapeHtml(payload.hint || "No hint available.")}</p></section>`;
 }
 
 function renderTestResults(payload) {

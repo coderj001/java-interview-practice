@@ -1,4 +1,5 @@
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+const MAX_TEST_CONTEXT_CHARS = 4000;
 
 async function reviewCode(challenge, code, apiKey, systemPrompt) {
   const prompt = buildReviewPrompt(challenge, code, systemPrompt);
@@ -19,6 +20,7 @@ async function hintCode(challenge, code, level, apiKey, systemPrompt) {
 }
 
 function buildReviewPrompt(challenge, code, systemPrompt) {
+  const testsContext = buildTestsContext(challenge);
   return [
     systemPrompt || "You are a Java interview coach.",
     "Return only JSON with keys: qualityAssessment, improvementSuggestion, followUpQuestions.",
@@ -38,6 +40,7 @@ function buildReviewPrompt(challenge, code, systemPrompt) {
     "```text",
     challenge.details || "",
     "```",
+    ...(testsContext ? ["", "Visible tests:", "```json", testsContext, "```"] : []),
     "",
     "User code:",
     "```java",
@@ -49,6 +52,7 @@ function buildReviewPrompt(challenge, code, systemPrompt) {
 function buildHintPrompt(challenge, code, level, systemPrompt) {
   const hintContext = Array.isArray(challenge.hints) ? challenge.hints.join("\n- ") : "";
   const guidanceStyle = challenge?.rules?.guidanceStyle || "socratic";
+  const testsContext = buildTestsContext(challenge);
   return [
     systemPrompt || "You are a Java interview coach.",
     "Return only JSON with key: hint.",
@@ -71,6 +75,7 @@ function buildHintPrompt(challenge, code, level, systemPrompt) {
     "```text",
     challenge.details || "",
     "```",
+    ...(testsContext ? ["", "Visible tests:", "```json", testsContext, "```"] : []),
     "",
     "User code:",
     "```java",
@@ -110,6 +115,14 @@ function asString(value) {
 
 function asStringArray(value) {
   return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+}
+
+function buildTestsContext(challenge) {
+  const tests = Array.isArray(challenge?.testCases) ? challenge.testCases : [];
+  if (!tests.length) return "";
+  const json = JSON.stringify(tests, null, 2);
+  if (json.length <= MAX_TEST_CONTEXT_CHARS) return json;
+  return `${json.slice(0, MAX_TEST_CONTEXT_CHARS)}\n/* truncated: test context too large */`;
 }
 
 module.exports = {
