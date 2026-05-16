@@ -1,5 +1,6 @@
 const http = require("node:http");
 const crypto = require("node:crypto");
+const { challengeById } = require("./challenge-loader");
 
 const sandboxUrl = new URL(process.env.SANDBOX_RUNTIME_URL || "http://127.0.0.1:7070");
 
@@ -8,13 +9,19 @@ function ensureJavaRuntimeCompiled() {
 }
 
 async function evaluateChallenge(challengeId, sourceCode, options = {}) {
+  const challenge = challengeById(challengeId);
+  const sandboxProfile = challenge && challenge.sandboxProfile && typeof challenge.sandboxProfile === "object"
+    ? challenge.sandboxProfile
+    : {};
   const payload = {
     challengeId: String(challengeId),
     sourceCode: String(sourceCode || ""),
     timeoutMs: Number.parseInt(process.env.SANDBOX_JOB_TIMEOUT_MS || "3000", 10),
     memoryMb: Number.parseInt(process.env.SANDBOX_JOB_MEMORY_MB || "128", 10),
     networkModeRequested: options.networkModeRequested || "",
-    traceId: options.traceId || crypto.randomUUID()
+    traceId: options.traceId || crypto.randomUUID(),
+    mode: String(sandboxProfile.mode || ""),
+    sandboxProfile
   };
 
   const response = await postJson(new URL("/execute", sandboxUrl), payload);

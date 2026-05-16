@@ -27,6 +27,9 @@ function ensureJavaRuntimeCompiled() {
   if (compiled) return;
   fs.mkdirSync(classesDir, { recursive: true });
   const javaFiles = collectJavaFiles(path.join(repoRoot, "src", "main", "java"));
+  if (javaFiles.length === 0) {
+    throw new Error("No Java runtime sources found under src/main/java. Reflective evaluation is unavailable.");
+  }
   const compileResult = spawnSync("javac", ["-d", classesDir, ...javaFiles], { cwd: repoRoot, encoding: "utf8" });
   if (compileResult.status !== 0) {
     throw new Error(`javac failed: ${compileResult.stderr || compileResult.stdout}`);
@@ -76,8 +79,52 @@ function validateRequest(payload) {
 
   return {
     ok: true,
-    value: { challengeId, sourceCode, timeoutMs: finalTimeoutMs, memoryMb: finalMemoryMb, networkMode, traceId }
+    value: {
+      challengeId,
+      sourceCode,
+      timeoutMs: finalTimeoutMs,
+      memoryMb: finalMemoryMb,
+      networkMode,
+      traceId,
+      mode: payload.mode,
+      sandboxProfile: payload.sandboxProfile || {}
+    }
   };
+}
+
+function extractJavaClassName(code) {
+  const match = String(code || "").match(/public\s+class\s+([A-Za-z_][A-Za-z0-9_]*)/);
+  return match ? match[1] : null;
+}
+
+function parseJUnitSummary(xmlPath) {
+  if (!fs.existsSync(xmlPath)) {
+    return { ok: false, code: "RUNTIME_ERROR", error: `JUnit report not found: ${xmlPath}` };
+  }
+  const xml = fs.readFileSync(xmlPath, "utf8");
+  const tests = Number((xml.match(/tests="(\d+)"/) || [])[1] || 0);
+  const failures = Number((xml.match(/failures="(\d+)"/) || [])[1] || 0);
+  const errors = Number((xml.match(/errors="(\d+)"/) || [])[1] || 0);
+  const skipped = Number((xml.match(/skipped="(\d+)"/) || [])[1] || 0);
+  const failed = failures + errors;
+  const passed = Math.max(0, tests - failed - skipped);
+  const correctnessPoints = tests > 0 ? Math.round((passed / tests) * 100) : 0;
+  return {
+    ok: true,
+    evaluation: {
+      accepted: failed === 0 && tests > 0,
+      correctnessPoints,
+      passedTests: passed,
+      totalTests: tests,
+      tests: []
+    }
+  };
+}
+
+function findJUnitXmlReport(reportsDir) {
+  if (!fs.existsSync(reportsDir)) return null;
+  const files = fs.readdirSync(reportsDir).filter((f) => f.endsWith(".xml")).sort();
+  return files.length > 0 ? path.join(reportsDir, files[0]) : null;
 }
 
 function evaluate({ challengeId, sourceCode, timeoutMs, memoryMb }, runJava = spawnSync) {
@@ -98,6 +145,82 @@ function evaluate({ challengeId, sourceCode, timeoutMs, memoryMb }, runJava = sp
       return { ok: false, code: "RUNTIME_ERROR", error: result.stderr || result.stdout || "Java runtime command failed." };
     }
     return { ok: true, evaluation: JSON.parse(result.stdout) };
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+function evaluateCustomTest({ sourceCode, timeoutMs, memoryMb, sandboxProfile }, runJava = spawnSync) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "java-sandbox-job-"));
+  const sourceFile = path.join(tempDir, "Solution.java");
+  const harnessCode = String(sandboxProfile.harnessCode || "");
+  const runner = String(sandboxProfile.runner || "raw");
+  const harnessClassName = String(sandboxProfile.harnessClassName || extractJavaClassName(harnessCode) || "").trim();
+  if (!harnessCode.trim()) return { ok: false, code: "VALIDATION_ERROR", error: "sandboxProfile.harnessCode is required for custom_test mode." };
+  if (!harnessClassName) return { ok: false, code: "VALIDATION_ERROR", error: "Unable to determine custom harness class name." };
+
+  const harnessFile = path.join(tempDir, `${harnessClassName}.java`);
+  fs.writeFileSync(sourceFile, sourceCode, "utf8");
+  fs.writeFileSync(harnessFile, harnessCode, "utf8");
+
+  try {
+    const compileResult = spawnSync("javac", ["-cp", ".:/app/libs/*", "Solution.java", `${harnessClassName}.java`], {
+      cwd: tempDir,
+      encoding: "utf8",
+      timeout: timeoutMs
+    });
+    if (compileResult.error && compileResult.error.code === "ETIMEDOUT") {
+      return { ok: false, code: "TIMEOUT", error: `Compilation timed out after ${timeoutMs}ms.` };
+    }
+    if (compileResult.status !== 0) {
+      return { ok: false, code: "COMPILE_ERROR", error: compileResult.stderr || compileResult.stdout || "Compilation failed." };
+    }
+
+    if (runner === "raw") {
+      const rawResult = runJava("java", ["-Xmx" + String(memoryMb) + "m", "-cp", ".:/app/libs/*", harnessClassName], {
+        cwd: tempDir,
+        encoding: "utf8",
+        timeout: timeoutMs
+      });
+      if (rawResult.error && rawResult.error.code === "ETIMEDOUT") {
+        return { ok: false, code: "TIMEOUT", error: `Execution timed out after ${timeoutMs}ms.` };
+      }
+      if (rawResult.status !== 0) {
+        return { ok: false, code: "RUNTIME_ERROR", error: rawResult.stderr || rawResult.stdout || "Raw harness command failed." };
+      }
+      return { ok: true, evaluation: JSON.parse(rawResult.stdout) };
+    }
+
+    if (runner === "junit") {
+      const reportsDir = path.join(tempDir, "reports");
+      fs.mkdirSync(reportsDir, { recursive: true });
+      const junitResult = runJava(
+        "java",
+        [
+          "-Xmx" + String(memoryMb) + "m",
+          "-cp",
+          ".:/app/libs/*",
+          "org.junit.platform.console.ConsoleLauncher",
+          "--select-class",
+          harnessClassName,
+          "--reports-dir",
+          "reports"
+        ],
+        { cwd: tempDir, encoding: "utf8", timeout: timeoutMs }
+      );
+      if (junitResult.error && junitResult.error.code === "ETIMEDOUT") {
+        return { ok: false, code: "TIMEOUT", error: `Execution timed out after ${timeoutMs}ms.` };
+      }
+      const reportPath = findJUnitXmlReport(reportsDir);
+      if (!reportPath) {
+        return { ok: false, code: "RUNTIME_ERROR", error: "JUnit did not generate XML reports." };
+      }
+      const summary = parseJUnitSummary(reportPath);
+      if (!summary.ok) return summary;
+      return summary;
+    }
+
+    return { ok: false, code: "VALIDATION_ERROR", error: `Unsupported custom_test runner '${runner}'.` };
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -133,7 +256,13 @@ function createServer() {
         return sendJson(res, 400, validated);
       }
 
-      const result = evaluate(validated.value);
+      const mode = String(validated.value.mode || validated.value.sandboxProfile.mode || "").trim();
+      let result;
+      try {
+        result = mode === "custom_test" ? evaluateCustomTest(validated.value) : evaluate(validated.value);
+      } catch (error) {
+        result = { ok: false, code: "RUNTIME_ERROR", error: String(error && error.message ? error.message : error) };
+      }
       if (!result.ok) {
         return sendJson(res, 400, { ...result, traceId: validated.value.traceId, networkMode: validated.value.networkMode });
       }
@@ -154,4 +283,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createServer, validateRequest, evaluate };
+module.exports = { createServer, validateRequest, evaluate, evaluateCustomTest, extractJavaClassName, parseJUnitSummary, findJUnitXmlReport };

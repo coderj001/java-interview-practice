@@ -1,4 +1,4 @@
 web-ui/node_modules/
+.java-runtime/
 target/
 out/
-.java-runtime/classes/

@@ -10,8 +10,9 @@ RUN useradd -m -u 10001 sandbox
 
 COPY src ./src
 COPY sandbox-runtime ./sandbox-runtime
+COPY target/dependency/ /app/libs/
 
-RUN mkdir -p /app/.java-runtime/classes && chown -R sandbox:sandbox /app
+RUN mkdir -p /app/.java-runtime/classes && chown -R sandbox:sandbox /app /app/libs
 
 USER sandbox
 

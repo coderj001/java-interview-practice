@@ -140,3 +140,75 @@ When working with OpenSpec in this repo, use:
 ```bash
 npx @fission-ai/openspec@latest
 ```
+
+## LLM Prompts For `challenges.json`
+
+Use these prompts in any web LLM to generate challenge entries you can paste into `challenges.json`.
+
+### 1) Reflective/Basic
+
+```text
+Generate one challenge JSON object for a Java interview platform.
+Mode: reflective.
+Include: id, title, level, tags, details, methodContract, explanation, starterCode, testCases (5+), sandboxProfile { mode, timeoutMs }, hints, rules, resources, examples.
+Method should be deterministic and testable with plain inputs/outputs.
+Output only valid JSON object, no markdown.
+```
+
+### 2) Concurrent/Threaded
+
+```text
+Generate one challenge JSON object for a Java interview platform.
+Mode: concurrent.
+Use a thread-safety problem (rate limiter, bounded buffer, etc).
+Include sandboxProfile with mode: "concurrent", concurrentThreads, timeoutMs.
+Test cases must use threshold-style expected fields like minAccepted, maxRejected, expectNoExceptions.
+Output only valid JSON object.
+```
+
+### 3) SQL/H2
+
+```text
+Generate one challenge JSON object for a Java interview platform.
+Mode: sql.
+Challenge should execute user SQL against H2.
+Include sandboxProfile { mode: "sql", timeoutMs, setup: [DDL/DML statements] }.
+testCases should validate row-level expected table contents.
+Output only valid JSON object.
+```
+
+### 4) Custom Test + Raw Runner
+
+```text
+Generate one challenge JSON object for a Java interview platform.
+Mode: custom_test, runner: raw.
+Include sandboxProfile with harnessClassName and harnessCode.
+harnessCode must define a Java class with main(String[] args) and print exactly one EvaluationResult JSON line.
+Output only valid JSON object.
+```
+
+### 5) Custom Test + JUnit/Mockito
+
+```text
+Generate one challenge JSON object for a Java interview platform.
+Mode: custom_test, runner: junit.
+Include sandboxProfile with harnessClassName and harnessCode using JUnit 5 + Mockito.
+Assume imports are available in sandbox libs.
+Keep starterCode minimal and methodContract clear.
+Output only valid JSON object.
+```
+
+### 6) Batch Prompt (All Types)
+
+```text
+Generate 8 challenge JSON objects as an array for a Java interview platform:
+- 3 reflective
+- 2 concurrent
+- 1 sql
+- 1 custom_test raw
+- 1 custom_test junit
+Each object must include full fields:
+id, title, level, tags, details, methodContract, explanation, starterCode, testCases, sandboxProfile, hints, rules, resources, examples, notes, score, bestScore, attempts, timeSpentMs, completedAt, status.
+Use unique ids and realistic test cases.
+Output only valid JSON array.
+```

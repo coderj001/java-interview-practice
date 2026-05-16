@@ -83,7 +83,7 @@
       "score": 100,
       "bestScore": 100,
       "attempts": 5,
-      "timeSpentMs": 135266,
+      "timeSpentMs": 276364,
       "completedAt": "2026-05-16T06:59:28.963Z",
       "status": "completed"
     },
@@ -583,6 +583,50 @@
       "timeSpentMs": 12249,
       "completedAt": null,
       "status": "in-progress"
+    },
+    {
+      "id": 99,
+      "title": "Custom Harness Mockito Smoke Test",
+      "level": "advanced",
+      "tags": [
+        "custom-test",
+        "junit",
+        "mockito"
+      ],
+      "details": "Implement `solve(String name)` and return the same value. This challenge validates custom_test + junit runner wiring.",
+      "methodContract": "String solve(String name)",
+      "explanation": "Return input unchanged.",
+      "starterCode": "public class Solution {\n    public String solve(String name) {\n        return name;\n    }\n}\n",
+      "testCases": [
+        {
+          "name": "placeholder",
+          "input": [
+            "alice"
+          ],
+          "expected": "alice"
+        }
+      ],
+      "sandboxProfile": {
+        "mode": "custom_test",
+        "runner": "junit",
+        "timeoutMs": 4000,
+        "harnessClassName": "CustomUserCrudHarness",
+        "harnessCode": "import org.junit.jupiter.api.Test;\nimport static org.junit.jupiter.api.Assertions.*;\nimport static org.mockito.Mockito.*;\n\npublic class CustomUserCrudHarness {\n    interface UserGateway { String normalize(String value); }\n\n    @Test\n    void echoesNormalizedName() {\n        UserGateway gateway = mock(UserGateway.class);\n        when(gateway.normalize(\"alice\")).thenReturn(\"alice\");\n\n        Solution solution = new Solution();\n        String actual = solution.solve(gateway.normalize(\"alice\"));\n\n        assertEquals(\"alice\", actual);\n        verify(gateway).normalize(\"alice\");\n    }\n}"
+      },
+      "hints": [],
+      "rules": {
+        "maxHintLevel": 1,
+        "guidanceStyle": "direct"
+      },
+      "resources": [],
+      "examples": [],
+      "notes": "",
+      "score": 100,
+      "bestScore": 100,
+      "attempts": 1,
+      "timeSpentMs": 1216800,
+      "completedAt": "2026-05-16T07:55:07.034Z",
+      "status": "completed"
     }
   ]
 }
