@@ -5,22 +5,22 @@ const path = require("node:path");
 
 const uiRoot = path.resolve(__dirname, "..");
 
-test("interview session script renders challenge context for both roles", () => {
+test("interview session script renders multi-challenge controls and gated interviewee flow", () => {
   const script = fs.readFileSync(path.join(uiRoot, "public", "interview-session.js"), "utf8");
 
   assert.match(script, /role === "interviewer"/);
-  assert.match(script, /challenge\.title/);
-  assert.match(script, /challenge\.details/);
-  assert.match(script, /window\.marked/);
-  assert.match(script, /id="editor"/);
-  assert.match(script, /CodeMirrorApp\.createEditor/);
-  assert.match(script, /runTestsForAssignedChallenge\(\)/);
-  assert.match(script, /submitSnapshot\(\)/);
+  assert.match(script, /challenge-assign-list/);
+  assert.match(script, /data-challenge-id/);
+  assert.match(script, /save-challenges/);
+  assert.match(script, /data-start-id/);
+  assert.match(script, /challengeStates/);
+  assert.match(script, /Interview Session Home/);
+  assert.match(script, /Waiting for interviewer to start this challenge/);
+  assert.match(script, /challenge-access/);
+  assert.match(script, /challenge-run/);
+  assert.match(script, /Submission Logs/);
   assert.match(script, /\+5 min/);
   assert.match(script, /\+10 min/);
-  assert.match(script, /progressPct/);
-  assert.match(script, /challenge-select/);
-  assert.match(script, /Submission Logs/);
 });
 
 test("interview pages load markdown parser and shared session script", () => {

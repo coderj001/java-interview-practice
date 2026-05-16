@@ -45,10 +45,10 @@ Create an interview session (example):
 ```bash
 curl -X POST http://127.0.0.1:3000/api/interview-sessions \
   -H "Content-Type: application/json" \
-  -d '{"interviewerId":"interviewer","intervieweeId":"interviewee","challengeId":"1","durationMs":1800000}'
+  -d '{"interviewerId":"interviewer","intervieweeId":"interviewee","challengeIds":["1","4"],"durationMs":1800000}'
 ```
 
-`challengeId` is optional. If omitted, the server assigns the first challenge by id. Interviewer can reassign challenge only before the timer is started.
+`challengeIds` is required and must include at least one runnable challenge id. Interviewer can reassign the list only before the timer is started.
 
 Open role-specific interfaces:
 
@@ -59,20 +59,27 @@ http://127.0.0.1:3000/interviewee/<sessionId>
 
 Locked interview mode:
 
-- Interviewee sees only assigned challenge + timer + editor controls (`VIM`, `Run Tests`, `Submit`).
-- Interviewer controls session and sees challenge picker, timer controls, and post-submit logs.
+- Interviewee lands on a dedicated session home with assigned challenge list and statuses.
+- Interviewee can open and code only on challenges already started by interviewer.
+- Interviewer controls session and sees multi-select challenge assignment, per-challenge start controls, timer controls, and post-submit logs.
 - Interviewer can add time with `+1`, `+5`, and `+10` minutes.
-- Challenge reassignment is blocked after session starts.
+- Challenge list reassignment is blocked after session starts.
 - Submission logs (status/code/output) are visible only to interviewer and only after submit.
 
 Interviewer control APIs:
 
 ```bash
-# choose challenge before start
-curl -X POST http://127.0.0.1:3000/api/interview-sessions/<sessionId>/challenge \
+# assign challenge list before start
+curl -X POST http://127.0.0.1:3000/api/interview-sessions/<sessionId>/challenges \
   -H "Content-Type: application/json" \
   -H "x-actor-id: interviewer" \
-  -d '{"challengeId":"2"}'
+  -d '{"challengeIds":["1","24"]}'
+
+# start one assigned challenge
+curl -X POST http://127.0.0.1:3000/api/interview-sessions/<sessionId>/challenges/1/start \
+  -H "Content-Type: application/json" \
+  -H "x-actor-id: interviewer" \
+  -d '{"actorId":"interviewer"}'
 
 # read interviewer-visible submissions
 curl -X GET "http://127.0.0.1:3000/api/interview-sessions/<sessionId>/submissions?actorId=interviewer" \

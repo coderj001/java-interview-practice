@@ -9,7 +9,11 @@
     editor: null,
     vimMode: false,
     challenges: [],
-    submissions: []
+    submissions: [],
+    lockedNotice: "",
+    interviewerDraftIds: null,
+    intervieweeViewKey: "",
+    intervieweeOutputText: "Ready."
   };
 
   render();
@@ -17,17 +21,23 @@
 
   async function bootstrap() {
     await loadSnapshot();
-    if (page.role === "interviewer") {
-      await Promise.all([loadChallengeOptions(), loadSubmissions()]);
-    }
+    await loadChallengeOptions();
+    if (page.role === "interviewer") await loadSubmissions();
     startLocalTicker();
     subscribeEvents();
     render();
   }
 
   async function loadSnapshot() {
-    const res = await fetch(`/api/interview-sessions/${page.sessionId}/state`);
+    const actorId = document.getElementById("actor-id")?.value || "";
+    const query = new URLSearchParams({ actorId });
+    const res = await fetch(`/api/interview-sessions/${page.sessionId}/state?${query.toString()}`, {
+      headers: { "x-actor-id": actorId }
+    });
     state.snapshot = await res.json();
+    if (page.role === "interviewer" && state.interviewerDraftIds === null) {
+      state.interviewerDraftIds = [...(state.snapshot?.assignedChallengeIds || [])];
+    }
   }
 
   async function loadChallengeOptions() {
@@ -47,12 +57,17 @@
   }
 
   function subscribeEvents() {
-    const stream = new EventSource(`/api/interview-sessions/${page.sessionId}/events`);
+    const actorId = document.getElementById("actor-id")?.value || "";
+    const query = new URLSearchParams({ actorId });
+    const stream = new EventSource(`/api/interview-sessions/${page.sessionId}/events?${query.toString()}`);
     ["session.snapshot", "timer.idle", "timer.running", "timer.paused", "timer.ended"].forEach((name) => {
       stream.addEventListener(name, async (event) => {
         const payload = JSON.parse(event.data || "{}");
         if (!state.snapshot || Number(payload.version) >= Number(state.snapshot.version)) {
           state.snapshot = payload;
+          if (page.role === "interviewer") {
+            state.interviewerDraftIds = [...(payload.assignedChallengeIds || [])];
+          }
           if (page.role === "interviewer") await loadSubmissions();
           render();
         }
@@ -87,24 +102,43 @@
   }
 
   function renderInterviewer() {
-    const snap = state.snapshot;
+    const snap = state.snapshot || {};
     const remainingMs = renderRemainingMs(snap);
-    const progressPct = Number(snap?.progressPct || 0);
-    const challenge = snap?.challenge || {};
-    const options = (state.challenges || [])
-      .map(
-        (item) =>
-          `<option value="${escapeHtml(item.id)}" ${String(item.id) === String(challenge.id) ? "selected" : ""}>#${escapeHtml(
-            item.id
-          )} ${escapeHtml(item.title)}</option>`
-      )
+    const progressPct = Number(snap.progressPct || 0);
+    const selectedIds = new Set(
+      Array.isArray(state.interviewerDraftIds) ? state.interviewerDraftIds : snap.assignedChallengeIds || []
+    );
+
+    const assignRows = (state.challenges || [])
+      .map((item) => {
+        const checked = selectedIds.has(String(item.id)) ? "checked" : "";
+        return `<label class="challenge-option">
+          <input type="checkbox" data-challenge-id="${escapeHtml(item.id)}" ${checked}>
+          <span>#${escapeHtml(item.id)} ${escapeHtml(item.title)}</span>
+        </label>`;
+      })
       .join("");
+
+    const stateById = new Map((snap.challengeStates || []).map((item) => [String(item.id), item.state]));
+    const rows = (state.challenges || [])
+      .filter((item) => selectedIds.has(String(item.id)))
+      .map((item) => {
+        const cState = stateById.get(String(item.id)) || "pending";
+        const startDisabled = cState !== "pending" ? "disabled" : "";
+        return `<li>
+          <span>#${escapeHtml(item.id)} ${escapeHtml(item.title)}</span>
+          <strong>${escapeHtml(cState)}</strong>
+          <button data-start-id="${escapeHtml(item.id)}" ${startDisabled}>Start</button>
+        </li>`;
+      })
+      .join("");
+
     const logs = (state.submissions || [])
       .slice()
       .reverse()
       .map(
         (entry) => `<details>
-            <summary>${escapeHtml(entry.submittedAt)} | ${escapeHtml(entry.status)}</summary>
+            <summary>${escapeHtml(entry.submittedAt)} | ${escapeHtml(entry.status)} | #${escapeHtml(entry.challengeId)}</summary>
             <pre>${escapeHtml(entry.code || "")}</pre>
             <pre>${escapeHtml(JSON.stringify(entry.output || {}, null, 2))}</pre>
           </details>`
@@ -116,18 +150,19 @@
         <h2>Interviewer Console</h2>
         <div id="session-timer">${formatDuration(remainingMs)}</div>
       </div>
-      <p><strong>State:</strong> ${escapeHtml(snap?.timerState || "loading")} | <strong>Phase:</strong> ${escapeHtml(
-      snap?.phase || "-"
-    )}</p>
-      <label>Challenge
-        <select id="challenge-select">${options}</select>
-      </label>
+      <p><strong>State:</strong> ${escapeHtml(snap.timerState || "loading")} | <strong>Phase:</strong> ${escapeHtml(snap.phase || "-")}</p>
+      <div>
+        <p><strong>Assign Challenges</strong></p>
+        <div id="challenge-assign-list">${assignRows || "<p>No runnable challenges.</p>"}</div>
+      </div>
+      <button id="save-challenges">Save Challenge List</button>
+      <ul class="challenge-states">${rows || "<li>No assigned challenges.</li>"}</ul>
       <div class="progress"><div style="width:${progressPct}%"></div></div>
-      <p><strong>Elapsed:</strong> ${formatDuration(snap?.elapsedMs || 0)} / <strong>Total:</strong> ${formatDuration(
-      snap?.totalBudgetMs || 0
+      <p><strong>Elapsed:</strong> ${formatDuration(snap.elapsedMs || 0)} / <strong>Total:</strong> ${formatDuration(
+      snap.totalBudgetMs || 0
     )}</p>
       <div class="editor-tools">
-        <button data-action="start">Start</button>
+        <button data-action="start">Start Timer</button>
         <button data-action="pause">Pause</button>
         <button data-action="resume">Resume</button>
         <button data-action="end">End</button>
@@ -145,46 +180,83 @@
     app.querySelectorAll("[data-adjust]").forEach((button) => {
       button.addEventListener("click", () => command("adjust", { deltaMs: Number(button.getAttribute("data-adjust")) || 0 }));
     });
-    const challengeSelect = document.getElementById("challenge-select");
-    if (challengeSelect) {
-      challengeSelect.disabled = snap?.phase === "running" || snap?.phase === "paused" || snap?.phase === "ended";
-      challengeSelect.addEventListener("change", () => assignChallenge(challengeSelect.value));
+    app.querySelectorAll("[data-start-id]").forEach((button) => {
+      button.addEventListener("click", () => startChallenge(button.getAttribute("data-start-id")));
+    });
+
+    const saveButton = document.getElementById("save-challenges");
+    if (saveButton) {
+      const locked = snap.phase === "running" || snap.phase === "paused" || snap.phase === "ended";
+      saveButton.disabled = locked;
+      saveButton.addEventListener("click", saveAssignedChallenges);
     }
+    app.querySelectorAll("[data-challenge-id]").forEach((input) => {
+      input.addEventListener("change", () => {
+        state.interviewerDraftIds = Array.from(document.querySelectorAll("[data-challenge-id]"))
+          .filter((entry) => entry.checked)
+          .map((entry) => entry.getAttribute("data-challenge-id"));
+      });
+    });
   }
 
   function renderInterviewee() {
-    const snap = state.snapshot;
-    const challenge = snap?.challenge || null;
+    const snap = state.snapshot || {};
     const remainingMs = renderRemainingMs(snap);
-    const progressPct = Number(snap?.progressPct || 0);
+    const progressPct = Number(snap.progressPct || 0);
+    const states = snap.challengeStates || [];
+    const viewKey = JSON.stringify({
+      states: states.map((entry) => ({ id: entry.id, state: entry.state })),
+      challenge: snap.challenge
+        ? { id: snap.challenge.id, locked: Boolean(snap.challenge.locked), title: snap.challenge.title }
+        : null
+    });
+    const rows = states
+      .map((item) => {
+        return `<li>
+          <span>#${escapeHtml(item.id)} ${escapeHtml(item.title)}</span>
+          <strong>${escapeHtml(item.state)}</strong>
+          <button data-open-id="${escapeHtml(item.id)}">Open</button>
+        </li>`;
+      })
+      .join("");
 
-    if (!challenge || !challenge.id) {
-      app.innerHTML = `<p>Waiting for interviewer to assign challenge.</p>
-      <p><strong>State:</strong> ${escapeHtml(snap?.timerState || "loading")}</p>
-      <p><strong>Remaining:</strong> ${formatDuration(remainingMs)}</p>`;
-      return;
-    }
-
-    const mounted = app.dataset.workspaceMounted === "true";
-    if (!mounted) {
+    if (state.intervieweeViewKey !== viewKey) {
       app.innerHTML = `<section class="workspace">
         <div class="workspace-head">
-          <h2>${escapeHtml(challenge.title)}</h2>
+          <h2>Interview Session Home</h2>
           <div id="session-timer">${formatDuration(remainingMs)}</div>
         </div>
         <div class="progress"><div id="session-progress" style="width:${progressPct}%"></div></div>
-        <article class="markdown" id="session-details">${renderMarkdown(challenge.details || "")}</article>
-        <div class="editor-tools">
-          <button id="vim-toggle">VIM</button>
-          <button id="run-tests">Run Tests</button>
-          <button id="submit">Submit</button>
-        </div>
-        <div id="editor"></div>
-        <pre id="candidate-output">Ready.</pre>
+        <p>Assigned challenges are visible below. Details unlock only after interviewer starts a challenge.</p>
+        ${state.lockedNotice ? `<p><strong>${escapeHtml(state.lockedNotice)}</strong></p>` : ""}
+        <ul class="challenge-states">${rows || "<li>Waiting for interviewer to assign challenges.</li>"}</ul>
+        <section id="challenge-detail">${renderIntervieweeDetail(snap)}</section>
       </section>`;
-      app.dataset.workspaceMounted = "true";
-      mountEditor(challenge);
-      bindIntervieweeHandlers();
+      state.intervieweeViewKey = viewKey;
+
+      if (snap.challenge?.id && !snap.challenge.locked) {
+        mountEditor(snap.challenge.starterCode || "");
+      }
+
+      app.querySelectorAll("[data-open-id]").forEach((button) => {
+        button.addEventListener("click", () => openChallenge(button.getAttribute("data-open-id")));
+      });
+
+      const vim = document.getElementById("vim-toggle");
+      if (vim) {
+        vim.addEventListener("click", () => {
+          state.vimMode = !state.vimMode;
+          const current = editorCode();
+          mountEditor(current);
+        });
+      }
+      const runTests = document.getElementById("run-tests");
+      if (runTests) runTests.addEventListener("click", () => runTestsForActiveChallenge());
+      const submit = document.getElementById("submit");
+      if (submit) submit.addEventListener("click", () => submitSnapshot());
+
+      const output = document.getElementById("candidate-output");
+      if (output) output.textContent = state.intervieweeOutputText;
     }
 
     const timer = document.getElementById("session-timer");
@@ -193,72 +265,101 @@
     if (progress) progress.style.width = `${progressPct}%`;
   }
 
-  async function assignChallenge(challengeId) {
+  function renderIntervieweeDetail(snap) {
+    const challenge = snap.challenge;
+    if (!challenge?.id) return "<p>Open a started challenge to begin coding.</p>";
+    if (challenge.locked) return "<p>Waiting for interviewer to start this challenge.</p>";
+    return `<article class="markdown" id="session-details">${renderMarkdown(challenge.details || "")}</article>
+      <div class="editor-tools">
+        <button id="vim-toggle">VIM</button>
+        <button id="run-tests">Run Tests</button>
+        <button id="submit">Submit</button>
+      </div>
+      <div id="editor"></div>
+      <pre id="candidate-output">Ready.</pre>`;
+  }
+
+  async function saveAssignedChallenges() {
+    const challengeIds = Array.isArray(state.interviewerDraftIds) ? [...state.interviewerDraftIds] : [];
     const actorId = document.getElementById("actor-id")?.value || "";
-    const res = await fetch(`/api/interview-sessions/${page.sessionId}/challenge`, {
+    const res = await fetch(`/api/interview-sessions/${page.sessionId}/challenges`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-actor-id": actorId },
-      body: JSON.stringify({ challengeId, actorId })
+      body: JSON.stringify({ actorId, challengeIds })
     });
     const payload = await res.json();
-    if (!res.ok) {
-      alert(payload.error || "Unable to assign challenge");
-      return;
-    }
+    if (!res.ok) return alert(payload.error || "Unable to save challenges");
+    state.snapshot = payload;
+    state.interviewerDraftIds = [...(payload.assignedChallengeIds || [])];
+    render();
+  }
+
+  async function startChallenge(challengeId) {
+    const actorId = document.getElementById("actor-id")?.value || "";
+    const res = await fetch(`/api/interview-sessions/${page.sessionId}/challenges/${encodeURIComponent(challengeId)}/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-actor-id": actorId },
+      body: JSON.stringify({ actorId })
+    });
+    const payload = await res.json();
+    if (!res.ok) return alert(payload.error || "Unable to start challenge");
     state.snapshot = payload;
     render();
   }
 
-  function mountEditor(challenge) {
+  async function openChallenge(challengeId) {
+    const actorId = document.getElementById("actor-id")?.value || "";
+    const res = await fetch(`/api/interview-sessions/${page.sessionId}/challenge-access`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-actor-id": actorId },
+      body: JSON.stringify({ actorId, challengeId })
+    });
+    const payload = await res.json();
+    if (!res.ok) {
+      state.lockedNotice = payload.message || payload.error || "Challenge is locked";
+      render();
+      return;
+    }
+    state.lockedNotice = "";
+    state.snapshot = payload;
+    render();
+  }
+
+  function mountEditor(code) {
     const host = document.getElementById("editor");
     if (!host) return;
     state.editor?.destroy?.();
     if (window.CodeMirrorApp) {
       state.editor = window.CodeMirrorApp.createEditor({
         element: host,
-        value: challenge.starterCode || "",
+        value: code || "",
         vimMode: state.vimMode
       });
       return;
     }
     state.editor = null;
-    host.innerHTML = `<textarea id="candidate-code-fallback" rows="16">${escapeHtml(challenge.starterCode || "")}</textarea>`;
+    host.innerHTML = `<textarea id="candidate-code-fallback" rows="16">${escapeHtml(code || "")}</textarea>`;
   }
 
-  function bindIntervieweeHandlers() {
-    const vim = document.getElementById("vim-toggle");
-    if (vim) {
-      vim.addEventListener("click", () => {
-        state.vimMode = !state.vimMode;
-        const challenge = state.snapshot?.challenge || {};
-        const current = editorCode();
-        mountEditor({ ...challenge, starterCode: current });
-      });
-    }
-    const runTests = document.getElementById("run-tests");
-    if (runTests) runTests.addEventListener("click", () => runTestsForAssignedChallenge());
-    const submit = document.getElementById("submit");
-    if (submit) submit.addEventListener("click", () => submitSnapshot());
-  }
-
-  async function runTestsForAssignedChallenge() {
-    if (!state.snapshot?.challenge?.id) return;
+  async function runTestsForActiveChallenge() {
+    if (!state.snapshot?.challenge?.id || state.snapshot?.challenge?.locked) return;
+    const actorId = document.getElementById("actor-id")?.value || "";
     const code = editorCode();
-    const userId = state.snapshot.intervieweeId || "interviewee";
-    const body = new URLSearchParams({ code, userId });
-    const res = await fetch(`/api/challenges/${encodeURIComponent(state.snapshot.challenge.id)}/run-tests`, {
+    const res = await fetch(`/api/interview-sessions/${page.sessionId}/challenge-run`, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-      body: body.toString()
+      headers: { "Content-Type": "application/json", "x-actor-id": actorId },
+      body: JSON.stringify({ actorId, challengeId: state.snapshot.challenge.id, code })
     });
     const payload = await res.json();
     const output = document.getElementById("candidate-output");
-    if (output) output.textContent = JSON.stringify(payload, null, 2);
+    state.intervieweeOutputText = JSON.stringify(payload, null, 2);
+    if (output) output.textContent = state.intervieweeOutputText;
   }
 
   async function submitSnapshot() {
+    if (!state.snapshot?.challenge?.id || state.snapshot?.challenge?.locked) return;
     const actorId = state.snapshot?.intervieweeId || "interviewee";
-    const body = { actorId, code: editorCode() };
+    const body = { actorId, challengeId: state.snapshot.challenge.id, code: editorCode() };
     const res = await fetch(`/api/interview-sessions/${page.sessionId}/submissions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-actor-id": actorId },
@@ -266,7 +367,8 @@
     });
     const payload = await res.json();
     const output = document.getElementById("candidate-output");
-    if (output) output.textContent = JSON.stringify(payload, null, 2);
+    state.intervieweeOutputText = JSON.stringify(payload, null, 2);
+    if (output) output.textContent = state.intervieweeOutputText;
   }
 
   function renderRemainingMs(snapshot) {

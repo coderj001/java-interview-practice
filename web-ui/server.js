@@ -176,22 +176,25 @@ app.post("/api/interview-sessions", (req, res) => {
     const interviewerId = String(req.body.interviewerId || "interviewer");
     const intervieweeId = String(req.body.intervieweeId || "interviewee");
     const durationMs = Math.max(0, Number.parseInt(String(req.body.durationMs || "2700000"), 10) || 0);
-    const challengeId = resolveSessionChallengeId(req.body.challengeId);
-    const challenge = challengeById(challengeId);
-    const session = interviewSessions.createSession({
-      interviewerId,
-      intervieweeId,
-      durationMs,
-      challenge: {
+    const challengeIds = resolveSessionChallengeIds(req.body.challengeIds, req.body.challengeId, { allowEmpty: true });
+    const challenges = challengeIds.map((challengeId) => {
+      const challenge = challengeById(challengeId);
+      return {
         id: challengeId,
         title: challenge.title,
         details: challenge.details,
         starterCode: challenge.starterCode
-      }
+      };
+    });
+    const session = interviewSessions.createSession({
+      interviewerId,
+      intervieweeId,
+      durationMs,
+      challenges
     });
     res.status(201).json(session);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(error.code || 400).json({ error: error.message });
   }
 });
 
@@ -210,23 +213,43 @@ app.get("/interviewee/:sessionId", (req, res) => {
 app.get("/api/interview-sessions/:sessionId/state", (req, res) => {
   const session = interviewSessions.getSession(req.params.sessionId);
   if (!session) return res.status(404).json({ error: `Unknown session: ${req.params.sessionId}` });
-  return res.json(interviewSessions.snapshot(session));
+  const actorId = String(req.get("x-actor-id") || req.query.actorId || "");
+  const role = actorId === session.interviewerId ? "interviewer" : "interviewee";
+  return res.json(interviewSessions.snapshotForRole(session, role));
 });
 
-app.post("/api/interview-sessions/:sessionId/challenge", (req, res) => {
+app.post("/api/interview-sessions/:sessionId/challenges", (req, res) => {
   try {
     const actorId = String(req.get("x-actor-id") || req.body.actorId || "");
-    const challengeId = requireRunnableChallengeId(req.body.challengeId);
-    const challenge = challengeById(challengeId);
-    const snapshot = interviewSessions.assignChallenge({
-      sessionId: req.params.sessionId,
-      actorId,
-      challenge: {
+    const challengeIds = resolveSessionChallengeIds(req.body.challengeIds, req.body.challengeId);
+    const challenges = challengeIds.map((challengeId) => {
+      const challenge = challengeById(challengeId);
+      return {
         id: challengeId,
         title: challenge.title,
         details: challenge.details,
         starterCode: challenge.starterCode
-      }
+      };
+    });
+    const snapshot = interviewSessions.assignChallenges({
+      sessionId: req.params.sessionId,
+      actorId,
+      challenges
+    });
+    res.json(snapshot);
+  } catch (error) {
+    res.status(error.code || 400).json({ error: error.message });
+  }
+});
+
+app.post("/api/interview-sessions/:sessionId/challenges/:challengeId/start", (req, res) => {
+  try {
+    const actorId = String(req.get("x-actor-id") || req.body.actorId || "");
+    const challengeId = requireRunnableChallengeId(req.params.challengeId);
+    const snapshot = interviewSessions.startAssignedChallenge({
+      sessionId: req.params.sessionId,
+      actorId,
+      challengeId
     });
     res.json(snapshot);
   } catch (error) {
@@ -250,12 +273,39 @@ app.post("/api/interview-sessions/:sessionId/timer/resume", (req, res) => mutate
 app.post("/api/interview-sessions/:sessionId/timer/end", (req, res) => mutateTimer(req, res, "end"));
 app.post("/api/interview-sessions/:sessionId/timer/adjust", (req, res) => mutateTimer(req, res, "adjust"));
 
+app.post("/api/interview-sessions/:sessionId/challenge-access", (req, res) => {
+  try {
+    const session = interviewSessions.getSession(req.params.sessionId);
+    if (!session) return res.status(404).json({ error: `Unknown session: ${req.params.sessionId}` });
+    const actorId = String(req.get("x-actor-id") || req.body.actorId || "");
+    const challengeId = requireRunnableChallengeId(req.body.challengeId);
+    interviewSessions.selectVisibleChallenge({ sessionId: req.params.sessionId, actorId, challengeId });
+    const role = actorId === session.interviewerId ? "interviewer" : "interviewee";
+    res.json(interviewSessions.snapshotForRole(session, role));
+  } catch (error) {
+    res.status(error.code || 400).json(error.payload || { error: error.message });
+  }
+});
+
+app.post("/api/interview-sessions/:sessionId/challenge-run", async (req, res) => {
+  try {
+    const actorId = String(req.get("x-actor-id") || req.body.actorId || "");
+    const challengeId = requireRunnableChallengeId(req.body.challengeId);
+    interviewSessions.challengeForRun({ sessionId: req.params.sessionId, actorId, challengeId });
+    const evaluation = await evaluateChallenge(challengeId, req.body.code || "");
+    res.json(evaluation);
+  } catch (error) {
+    res.status(error.code || 400).json(error.payload || { error: error.message });
+  }
+});
+
 app.post("/api/interview-sessions/:sessionId/submissions", async (req, res) => {
   try {
     const session = interviewSessions.getSession(req.params.sessionId);
     if (!session) return res.status(404).json({ error: `Unknown session: ${req.params.sessionId}` });
     const actorId = String(req.get("x-actor-id") || req.body.actorId || "");
-    const challengeId = String(session.challenge.id || "");
+    const challengeId = String(req.body.challengeId || session.activeChallengeId || "");
+    interviewSessions.challengeForRun({ sessionId: req.params.sessionId, actorId, challengeId });
     const code = String(req.body.code || "");
     const evaluation = await evaluateChallenge(challengeId, code);
     const status = Number(evaluation.correctnessPoints || 0) === 100 ? "passed" : "failed";
@@ -289,17 +339,20 @@ app.get("/api/interview-sessions/:sessionId/submissions", (req, res) => {
 app.get("/api/interview-sessions/:sessionId/events", (req, res) => {
   const session = interviewSessions.getSession(req.params.sessionId);
   if (!session) return res.status(404).json({ error: `Unknown session: ${req.params.sessionId}` });
+  const actorId = String(req.get("x-actor-id") || req.query.actorId || "");
+  const role = actorId === session.interviewerId ? "interviewer" : "interviewee";
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
   res.write(`event: session.snapshot\n`);
-  res.write(`data: ${JSON.stringify(interviewSessions.snapshot(session))}\n\n`);
+  res.write(`data: ${JSON.stringify(interviewSessions.snapshotForRole(session, role))}\n\n`);
 
   const unsubscribe = interviewSessions.subscribe(req.params.sessionId, (event) => {
+    const scoped = role === "interviewer" ? event : interviewSessions.snapshotForRole(session, role);
     res.write(`event: timer.${event.timerState}\n`);
-    res.write(`data: ${JSON.stringify(event)}\n\n`);
+    res.write(`data: ${JSON.stringify(scoped)}\n\n`);
   });
 
   req.on("close", () => {
@@ -319,21 +372,26 @@ function requireChallengeId(rawChallengeId) {
   return challengeId;
 }
 
-function requireSessionChallengeId(rawChallengeId) {
-  if (rawChallengeId === undefined || rawChallengeId === null || String(rawChallengeId).trim() === "") {
-    throw new Error("Missing challengeId");
+function resolveSessionChallengeIds(rawChallengeIds, rawChallengeId, options) {
+  const list = Array.isArray(rawChallengeIds)
+    ? rawChallengeIds
+    : rawChallengeIds === undefined && rawChallengeId !== undefined
+    ? [rawChallengeId]
+    : [];
+  const normalized = [];
+  const seen = new Set();
+  for (const raw of list) {
+    const challengeId = requireRunnableChallengeId(raw);
+    if (seen.has(challengeId)) continue;
+    seen.add(challengeId);
+    normalized.push(challengeId);
   }
-  return requireChallengeId(rawChallengeId);
-}
-
-function resolveSessionChallengeId(rawChallengeId) {
-  if (rawChallengeId !== undefined && rawChallengeId !== null && String(rawChallengeId).trim() !== "") {
-    return requireRunnableChallengeId(rawChallengeId);
+  if (!normalized.length && !options?.allowEmpty) {
+    const error = new Error("At least one challengeId is required");
+    error.code = 400;
+    throw error;
   }
-
-  const first = listChallenges().find((challenge) => runnableChallengeIds.has(String(challenge.id)));
-  if (!first) throw new Error("No challenges available");
-  return requireChallengeId(first.id);
+  return normalized;
 }
 
 function requireRunnableChallengeId(rawChallengeId) {

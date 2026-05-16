@@ -1,27 +1,25 @@
 [
   {
-    "name": "correct row count after inserts",
-    "assertTable": "users",
-    "expectedRowCount": 2,
-    "description": "After inserting 3 users and deleting inactive ones, exactly 2 active users should remain."
+    "name": "exactly two users remain after delete",
+    "description": "The harness calls solve(conn), then asserts the total row count. Charlie (inactive) must have been deleted, leaving Alice and Bob.",
+    "assertQuery": "SELECT COUNT(*) FROM users",
+    "expectedSingleValue": 2
   },
   {
-    "name": "Alice email updated",
-    "assertTable": "users",
+    "name": "Alice's email is updated",
+    "description": "The harness asserts the email column for Alice after solve(conn) returns.",
     "assertQuery": "SELECT email FROM users WHERE name = 'Alice'",
-    "expectedSingleValue": "alice@company.com",
-    "description": "Alice's email should be updated to alice@company.com."
+    "expectedSingleValue": "alice@company.com"
   },
   {
     "name": "no inactive users remain",
-    "assertTable": "users",
+    "description": "All rows with active=FALSE must have been removed by the user's Java JDBC delete statement.",
     "assertQuery": "SELECT COUNT(*) FROM users WHERE active = FALSE",
-    "expectedSingleValue": 0,
-    "description": "All inactive users must have been deleted."
+    "expectedSingleValue": 0
   },
   {
-    "name": "active users have correct emails",
-    "assertTable": "users",
+    "name": "active users have correct names and emails",
+    "description": "The harness runs an ORDER BY query after solve(conn) and compares all columns row-by-row.",
     "assertQuery": "SELECT name, email FROM users WHERE active = TRUE ORDER BY name",
     "expectedRows": [
       {
@@ -32,7 +30,6 @@
         "name": "Bob",
         "email": "bob@example.com"
       }
-    ],
-    "description": "The two remaining active users are Alice (with updated email) and Bob."
+    ]
   }
 ]
