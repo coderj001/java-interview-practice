@@ -1,4 +1,5 @@
 const path = require("node:path");
+try { process.loadEnvFile(path.resolve(__dirname, "../.env")); } catch (e) {}
 const express = require("express");
 const { ensureJavaRuntimeCompiled, evaluateChallenge } = require("./src/node/java-runtime");
 const { availableProviders, reviewCode, hintCode } = require("./src/node/ai-provider");

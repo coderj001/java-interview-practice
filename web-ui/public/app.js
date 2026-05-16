@@ -1,5 +1,20 @@
 const initialState = window.__INITIAL_STATE__ || {};
-const state = { challenges: initialState.challenges || [], activeId: null, sessionStartMs: null, timer: null, hintLevel: "", vimMode: false, editor: null, notesTimer: null };
+const state = {
+  challenges: initialState.challenges || [],
+  activeId: null,
+  sessionStartMs: null,
+  timer: null,
+  hintLevel: "",
+  vimMode: false,
+  editor: null,
+  notesTimer: null,
+  editorDrafts: {},
+  activeFeedbackPanel: "tests",
+  activeWorkspacePanel: "code",
+  lastTestResultHtml: "Ready.",
+  lastReviewPayload: null,
+  lastHintPayload: null
+};
 const app = document.getElementById("app");
 
 window.addEventListener("hashchange", renderRoute);
@@ -30,26 +45,98 @@ function renderHome() {
 function renderWorkspace() {
   const challenge = state.challenges.find((c) => Number(c.id) === Number(state.activeId));
   if (!challenge) return;
-  app.innerHTML = `<section class="panel workspace"><div class="workspace-head"><button id="go-home">Home</button><h2>${challenge.title}</h2><div id="timer">${formatDuration(challenge.timeSpentMs || 0)}</div></div><article class="markdown" id="details"></article><div class="editor-tools"><button id="vim-toggle">VIM</button><button id="run-tests">Run Tests</button><button id="submit">Submit</button><button id="review">Review</button><button id="hint">Next Hint</button></div><div id="editor"></div><textarea id="notes" placeholder="Your notes...">${escapeHtml(challenge.notes || "")}</textarea><div id="output" class="output-panel">Ready.</div><pre id="ai-output"></pre></section>`;
+  app.innerHTML = `<section class="panel workspace-shell">
+    ${renderWorkspaceHeader(challenge)}
+    ${renderMobileWorkspaceTabs()}
+    <div class="workspace-grid">
+      ${renderProblemPane()}
+      ${renderCodePane()}
+    </div>
+    ${renderFeedbackPane(challenge)}
+  </section>`;
   document.getElementById("details").innerHTML = window.marked ? window.marked.parse(challenge.details || "") : escapeHtml(challenge.details || "");
+  renderFeedbackContent(challenge);
   setupEditor(challenge);
   bindWorkspaceHandlers(challenge);
+}
+
+function renderWorkspaceHeader(challenge) {
+  return `<header class="workspace-head">
+    <button id="go-home">Home</button>
+    <h2>${escapeHtml(challenge.title)}</h2>
+    <div id="timer">${formatDuration(challenge.timeSpentMs || 0)}</div>
+  </header>`;
+}
+
+function renderMobileWorkspaceTabs() {
+  return `<nav class="workspace-mobile-tabs">
+    <button type="button" class="mobile-tab${state.activeWorkspacePanel === "problem" ? " active" : ""}" data-panel="problem">Problem</button>
+    <button type="button" class="mobile-tab${state.activeWorkspacePanel === "code" ? " active" : ""}" data-panel="code">Code</button>
+    <button type="button" class="mobile-tab${state.activeWorkspacePanel === "feedback" ? " active" : ""}" data-panel="feedback">Feedback</button>
+  </nav>`;
+}
+
+function renderProblemPane() {
+  return `<section class="workspace-pane problem-pane${state.activeWorkspacePanel === "problem" ? " mobile-active" : ""}" id="problem-pane">
+    <article class="markdown" id="details"></article>
+  </section>`;
+}
+
+function renderCodePane() {
+  return `<section class="workspace-pane code-pane${state.activeWorkspacePanel === "code" ? " mobile-active" : ""}" id="code-pane">
+    <div class="editor-tools">
+      <button id="vim-toggle">VIM</button>
+      <button id="run-tests">Run Tests</button>
+      <button id="submit">Submit</button>
+      <button id="review">Review</button>
+      <button id="hint">Next Hint</button>
+    </div>
+    <div id="editor"></div>
+  </section>`;
+}
+
+function renderFeedbackPane(challenge) {
+  return `<section class="workspace-pane feedback-pane${state.activeWorkspacePanel === "feedback" ? " mobile-active" : ""}" id="feedback-pane">
+    <div class="feedback-tabs">
+      <button type="button" class="feedback-tab${state.activeFeedbackPanel === "tests" ? " active" : ""}" data-feedback="tests">Tests</button>
+      <button type="button" class="feedback-tab${state.activeFeedbackPanel === "review" ? " active" : ""}" data-feedback="review">Review</button>
+      <button type="button" class="feedback-tab${state.activeFeedbackPanel === "hint" ? " active" : ""}" data-feedback="hint">Hints</button>
+      <button type="button" class="feedback-tab${state.activeFeedbackPanel === "notes" ? " active" : ""}" data-feedback="notes">Notes</button>
+    </div>
+    <div class="feedback-body">
+      <div id="feedback-tests" class="feedback-panel${state.activeFeedbackPanel === "tests" ? " active" : ""}">${state.lastTestResultHtml || "Ready."}</div>
+      <pre id="feedback-review" class="feedback-panel${state.activeFeedbackPanel === "review" ? " active" : ""}">${escapeHtml(formatJson(state.lastReviewPayload))}</pre>
+      <pre id="feedback-hint" class="feedback-panel${state.activeFeedbackPanel === "hint" ? " active" : ""}">${escapeHtml(formatJson(state.lastHintPayload))}</pre>
+      <textarea id="notes" class="feedback-panel${state.activeFeedbackPanel === "notes" ? " active" : ""}" placeholder="Your notes...">${escapeHtml(challenge.notes || "")}</textarea>
+    </div>
+  </section>`;
 }
 
 function setupEditor(challenge) {
   const host = document.getElementById("editor");
   if (!window.CodeMirrorApp) return;
   state.editor?.destroy?.();
-  state.editor = window.CodeMirrorApp.createEditor({ element: host, value: challenge.starterCode || "", vimMode: state.vimMode });
+  const draft = state.editorDrafts[String(challenge.id)];
+  state.editor = window.CodeMirrorApp.createEditor({ element: host, value: draft ?? (challenge.starterCode || ""), vimMode: state.vimMode });
 }
 
 function bindWorkspaceHandlers(challenge) {
   document.getElementById("go-home").addEventListener("click", () => { flushSessionTime(); window.location.hash = "#/home"; });
-  document.getElementById("vim-toggle").addEventListener("click", () => { state.vimMode = !state.vimMode; renderWorkspace(); });
+  document.getElementById("vim-toggle").addEventListener("click", () => { persistEditorDraft(); state.vimMode = !state.vimMode; renderWorkspace(); });
   document.getElementById("run-tests").addEventListener("click", () => runAction("run-tests"));
   document.getElementById("submit").addEventListener("click", () => runAction("submit"));
   document.getElementById("review").addEventListener("click", requestReview);
   document.getElementById("hint").addEventListener("click", requestHint);
+  app.querySelectorAll("[data-panel]").forEach((btn) => btn.addEventListener("click", () => {
+    persistEditorDraft();
+    state.activeWorkspacePanel = btn.dataset.panel || "code";
+    renderWorkspace();
+  }));
+  app.querySelectorAll("[data-feedback]").forEach((btn) => btn.addEventListener("click", () => {
+    persistEditorDraft();
+    state.activeFeedbackPanel = btn.dataset.feedback || "tests";
+    renderWorkspace();
+  }));
   const notes = document.getElementById("notes");
   notes.addEventListener("input", () => {
     clearTimeout(state.notesTimer);
@@ -87,30 +174,48 @@ async function saveNotes(notes) {
 
 function editorCode() { return state.editor ? state.editor.state.doc.toString() : ""; }
 
+function persistEditorDraft() {
+  if (!state.activeId) return;
+  if (!state.editor) return;
+  state.editorDrafts[String(state.activeId)] = editorCode();
+}
+
 async function runAction(action) {
+  persistEditorDraft();
   const body = new URLSearchParams({ code: editorCode(), userId: document.getElementById("user-id").value || "guest" });
   const res = await fetch(`/api/challenges/${state.activeId}/${action}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" }, body: body.toString() });
   const payload = await res.json();
-  document.getElementById("output").innerHTML = renderTestResults(payload);
+  state.lastTestResultHtml = renderTestResults(payload);
+  state.activeFeedbackPanel = "tests";
+  state.activeWorkspacePanel = "feedback";
+  renderWorkspace();
   if (action === "submit") refreshChallenges();
 }
 
 async function requestReview() {
+  persistEditorDraft();
   const provider = document.getElementById("provider")?.value;
   if (!provider) return;
   const body = new URLSearchParams({ code: editorCode(), provider });
   const res = await fetch(`/api/challenges/${state.activeId}/review`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" }, body: body.toString() });
-  document.getElementById("ai-output").textContent = JSON.stringify(await res.json(), null, 2);
+  state.lastReviewPayload = await res.json();
+  state.activeFeedbackPanel = "review";
+  state.activeWorkspacePanel = "feedback";
+  renderWorkspace();
 }
 
 async function requestHint() {
+  persistEditorDraft();
   const provider = document.getElementById("provider")?.value;
   if (!provider) return;
   const body = new URLSearchParams({ code: editorCode(), provider, currentLevel: state.hintLevel || "" });
   const res = await fetch(`/api/challenges/${state.activeId}/hint`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" }, body: body.toString() });
   const payload = await res.json();
   state.hintLevel = payload.nextLevel === "max" ? state.hintLevel : payload.nextLevel;
-  document.getElementById("ai-output").textContent = JSON.stringify(payload, null, 2);
+  state.lastHintPayload = payload;
+  state.activeFeedbackPanel = "hint";
+  state.activeWorkspacePanel = "feedback";
+  renderWorkspace();
 }
 
 async function refreshChallenges() {
@@ -140,6 +245,21 @@ function decodeHtmlEntities(text) {
   const textArea = document.createElement('textarea');
   textArea.innerHTML = String(text);
   return textArea.value;
+}
+
+function renderFeedbackContent(challenge) {
+  const tests = document.getElementById("feedback-tests");
+  if (tests) tests.innerHTML = state.lastTestResultHtml || "Ready.";
+  const review = document.getElementById("feedback-review");
+  if (review) review.textContent = formatJson(state.lastReviewPayload);
+  const hint = document.getElementById("feedback-hint");
+  if (hint) hint.textContent = formatJson(state.lastHintPayload);
+  const notes = document.getElementById("notes");
+  if (notes && notes.value !== (challenge.notes || "")) notes.value = challenge.notes || "";
+}
+
+function formatJson(value) {
+  return value ? JSON.stringify(value, null, 2) : "No data yet.";
 }
 
 function renderTestResults(payload) {

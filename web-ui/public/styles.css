@@ -9,9 +9,37 @@ button{cursor:pointer;border-color:var(--primary)}
 table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #2d3449;text-align:left}
 .chip{display:inline-block;border-radius:999px;padding:2px 8px;font-family:"JetBrains Mono",monospace;font-size:12px;text-transform:capitalize}
 .chip.beginner{color:var(--success);background:rgba(0,255,171,.13)}.chip.intermediate{color:var(--warn);background:rgba(251,191,36,.15)}.chip.advanced{color:var(--error);background:rgba(244,63,94,.15)}.chip.tag{color:var(--muted);background:rgba(185,202,203,.15)}
-.workspace{display:grid;gap:12px}.workspace-head{display:flex;align-items:center;gap:12px}.workspace-head h2{margin:0 auto 0 0}.markdown{color:var(--muted)}#editor{min-height:280px;border:1px solid #2d3449;border-radius:8px;overflow:hidden}
-.editor-tools{display:flex;gap:8px;flex-wrap:wrap}textarea{min-height:110px}pre{white-space:pre-wrap;background:#0b1122;border:1px solid #2d3449;border-radius:8px;padding:10px}
-@media (max-width:768px){.app-shell{padding:12px}.top-bar{flex-direction:column;align-items:stretch}}
+.workspace-shell{display:grid;gap:12px}
+.workspace-head{display:flex;align-items:center;gap:12px}
+.workspace-head h2{margin:0 auto 0 0}
+.workspace-mobile-tabs{display:none}
+.workspace-grid{display:grid;grid-template-columns:minmax(320px,40%) minmax(480px,1fr);gap:12px;align-items:stretch}
+.workspace-pane{border:1px solid #2d3449;border-radius:8px;background:#0f162a;padding:12px;min-width:0}
+.problem-pane{max-height:min(66vh,780px);overflow:auto}
+.code-pane{display:grid;grid-template-rows:auto minmax(420px,1fr);gap:10px}
+.markdown{color:var(--muted)}
+#editor{min-height:420px;height:100%;border:1px solid #2d3449;border-radius:8px;overflow:hidden}
+.editor-tools{display:flex;gap:8px;flex-wrap:wrap}
+.feedback-pane{display:grid;gap:10px}
+.feedback-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.feedback-tab.active,.mobile-tab.active{background:rgba(0,240,255,.15);border-color:var(--primary)}
+.feedback-body{border:1px solid #2d3449;border-radius:8px;background:#0b1122;min-height:220px;padding:10px}
+.feedback-panel{display:none}
+.feedback-panel.active{display:block}
+#notes.feedback-panel.active{min-height:190px}
+textarea{min-height:110px}
+pre{white-space:pre-wrap;background:#0b1122;border:1px solid #2d3449;border-radius:8px;padding:10px}
+@media (max-width:900px){
+  .app-shell{padding:12px}
+  .top-bar{flex-direction:column;align-items:stretch}
+  .workspace-mobile-tabs{display:flex;gap:8px}
+  .workspace-grid{display:block}
+  .workspace-pane{display:none}
+  .workspace-pane.mobile-active{display:block}
+  .problem-pane,.code-pane,.feedback-pane{max-height:none}
+  .code-pane{grid-template-rows:auto minmax(300px,1fr)}
+  #editor{min-height:300px}
+}
 
 .output-panel { background: #0b1122; border: 1px solid #2d3449; border-radius: 8px; padding: 14px; font-family: "JetBrains Mono", monospace; font-size: 13px; overflow: auto; max-height: 400px; }
 .test-summary { display: flex; gap: 16px; margin-bottom: 12px; align-items: center; background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; }

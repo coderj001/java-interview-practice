@@ -3,7 +3,23 @@ const path = require("node:path");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 const challengesJsonPath = path.join(repoRoot, "challenges.json");
-const runtimeChallengesRoot = path.join(repoRoot, ".java-runtime", "challenges");
+const runtimeChallengesRoot = resolveRuntimeChallengesRoot();
+
+function resolveRuntimeChallengesRoot() {
+  const preferred = path.join(repoRoot, ".java-runtime", "challenges");
+  if (isWritable(preferred)) return preferred;
+  return path.resolve(__dirname, "..", "..", ".java-runtime", "challenges");
+}
+
+function isWritable(targetPath) {
+  try {
+    fs.mkdirSync(targetPath, { recursive: true });
+    fs.accessSync(targetPath, fs.constants.W_OK);
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
 
 function loadChallengesFile() {
   const payload = JSON.parse(fs.readFileSync(challengesJsonPath, "utf8"));
