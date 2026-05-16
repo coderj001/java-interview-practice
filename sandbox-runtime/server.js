@@ -22,6 +22,23 @@ const policy = {
 };
 
 let compiled = false;
+let challengeIndex = null;
+
+function loadChallengeIndex() {
+  if (challengeIndex) return challengeIndex;
+  const file = path.join(repoRoot, "challenges.json");
+  if (!fs.existsSync(file)) {
+    challengeIndex = new Map();
+    return challengeIndex;
+  }
+  const root = JSON.parse(fs.readFileSync(file, "utf8"));
+  const map = new Map();
+  for (const c of root.challenges || []) {
+    map.set(String(c.id), c);
+  }
+  challengeIndex = map;
+  return challengeIndex;
+}
 
 function ensureJavaRuntimeCompiled() {
   if (compiled) return;
@@ -30,7 +47,7 @@ function ensureJavaRuntimeCompiled() {
   if (javaFiles.length === 0) {
     throw new Error("No Java runtime sources found under src/main/java. Reflective evaluation is unavailable.");
   }
-  const compileResult = spawnSync("javac", ["-d", classesDir, ...javaFiles], { cwd: repoRoot, encoding: "utf8" });
+  const compileResult = spawnSync("javac", ["-cp", "/app/libs/*", "-d", classesDir, ...javaFiles], { cwd: repoRoot, encoding: "utf8" });
   if (compileResult.status !== 0) {
     throw new Error(`javac failed: ${compileResult.stderr || compileResult.stdout}`);
   }
@@ -77,6 +94,13 @@ function validateRequest(payload) {
     networkMode = requested;
   }
 
+  const challengeMeta = loadChallengeIndex().get(challengeId);
+  const resolvedMode = String(payload.mode || (challengeMeta && challengeMeta.sandboxProfile && challengeMeta.sandboxProfile.mode) || "").trim();
+  const resolvedSandboxProfile = {
+    ...((challengeMeta && challengeMeta.sandboxProfile) || {}),
+    ...(payload.sandboxProfile || {})
+  };
+
   return {
     ok: true,
     value: {
@@ -86,8 +110,8 @@ function validateRequest(payload) {
       memoryMb: finalMemoryMb,
       networkMode,
       traceId,
-      mode: payload.mode,
-      sandboxProfile: payload.sandboxProfile || {}
+      mode: resolvedMode,
+      sandboxProfile: resolvedSandboxProfile
     }
   };
 }
@@ -109,6 +133,21 @@ function parseJUnitSummary(xmlPath) {
   const failed = failures + errors;
   const passed = Math.max(0, tests - failed - skipped);
   const correctnessPoints = tests > 0 ? Math.round((passed / tests) * 100) : 0;
+  const testItems = [];
+  const testcaseRegex = /<testcase\b([^>]*)>([\s\S]*?)<\/testcase>|<testcase\b([^>]*)\/>/g;
+  let match;
+  while ((match = testcaseRegex.exec(xml)) !== null) {
+    const attrs = (match[1] || match[3] || "");
+    const body = match[2] || "";
+    const nameMatch = attrs.match(/\bname="([^"]+)"/);
+    const testName = nameMatch ? nameMatch[1] : "unknown";
+    const failureMatch = body.match(/<(failure|error)\b[^>]*message="([^"]*)"/);
+    testItems.push({
+      name: testName,
+      passed: !failureMatch,
+      detail: failureMatch ? failureMatch[2] : "Passed"
+    });
+  }
   return {
     ok: true,
     evaluation: {
@@ -116,7 +155,7 @@ function parseJUnitSummary(xmlPath) {
       correctnessPoints,
       passedTests: passed,
       totalTests: tests,
-      tests: []
+      tests: testItems
     }
   };
 }
@@ -135,7 +174,7 @@ function evaluate({ challengeId, sourceCode, timeoutMs, memoryMb }, runJava = sp
   try {
     const result = runJava(
       "java",
-      ["-Xmx" + String(memoryMb) + "m", "-cp", classesDir, "com.interview.platform.web.ChallengeWorkbenchCli", "evaluate", challengeId, sourceFile],
+      ["-Xmx" + String(memoryMb) + "m", "-cp", classesDir + ":/app/libs/*", "com.interview.platform.web.ChallengeWorkbenchCli", "evaluate", challengeId, sourceFile],
       { cwd: repoRoot, encoding: "utf8", timeout: timeoutMs }
     );
     if (result.error && result.error.code === "ETIMEDOUT") {

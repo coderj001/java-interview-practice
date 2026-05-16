@@ -30,7 +30,7 @@ function renderHome() {
 function renderWorkspace() {
   const challenge = state.challenges.find((c) => Number(c.id) === Number(state.activeId));
   if (!challenge) return;
-  app.innerHTML = `<section class="panel workspace"><div class="workspace-head"><button id="go-home">Home</button><h2>${challenge.title}</h2><div id="timer">${formatDuration(challenge.timeSpentMs || 0)}</div></div><article class="markdown" id="details"></article><div class="editor-tools"><button id="vim-toggle">VIM</button><button id="run-tests">Run Tests</button><button id="submit">Submit</button><button id="review">Review</button><button id="hint">Next Hint</button></div><div id="editor"></div><textarea id="notes" placeholder="Your notes...">${escapeHtml(challenge.notes || "")}</textarea><pre id="output">Ready.</pre><pre id="ai-output"></pre></section>`;
+  app.innerHTML = `<section class="panel workspace"><div class="workspace-head"><button id="go-home">Home</button><h2>${challenge.title}</h2><div id="timer">${formatDuration(challenge.timeSpentMs || 0)}</div></div><article class="markdown" id="details"></article><div class="editor-tools"><button id="vim-toggle">VIM</button><button id="run-tests">Run Tests</button><button id="submit">Submit</button><button id="review">Review</button><button id="hint">Next Hint</button></div><div id="editor"></div><textarea id="notes" placeholder="Your notes...">${escapeHtml(challenge.notes || "")}</textarea><div id="output" class="output-panel">Ready.</div><pre id="ai-output"></pre></section>`;
   document.getElementById("details").innerHTML = window.marked ? window.marked.parse(challenge.details || "") : escapeHtml(challenge.details || "");
   setupEditor(challenge);
   bindWorkspaceHandlers(challenge);
@@ -91,7 +91,7 @@ async function runAction(action) {
   const body = new URLSearchParams({ code: editorCode(), userId: document.getElementById("user-id").value || "guest" });
   const res = await fetch(`/api/challenges/${state.activeId}/${action}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" }, body: body.toString() });
   const payload = await res.json();
-  document.getElementById("output").textContent = JSON.stringify(payload, null, 2);
+  document.getElementById("output").innerHTML = renderTestResults(payload);
   if (action === "submit") refreshChallenges();
 }
 
@@ -134,4 +134,51 @@ function formatDuration(ms) {
 
 function escapeHtml(text) {
   return String(text).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+function decodeHtmlEntities(text) {
+  const textArea = document.createElement('textarea');
+  textArea.innerHTML = String(text);
+  return textArea.value;
+}
+
+function renderTestResults(payload) {
+  if (payload.error) {
+    return `<div class="error-msg">Error: ${escapeHtml(payload.error)}</div>`;
+  }
+  if (!payload.tests) {
+    return `<pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`;
+  }
+  
+  let html = `<div class="test-summary">
+    <span class="test-badge ${payload.accepted ? 'success' : 'failure'}">${payload.accepted ? 'ACCEPTED' : 'FAILED'}</span>
+    <span>Score: <strong>${payload.correctnessPoints}</strong></span>
+    <span>Passed: <strong>${payload.passedTests} / ${payload.totalTests}</strong></span>
+  </div>`;
+  
+  html += `<ul class="test-list">`;
+  for (const test of payload.tests) {
+    const statusClass = test.passed ? 'test-passed' : 'test-failed';
+    const statusIcon = test.passed ? '✅' : '❌';
+    let detailHtml = '';
+    
+    if (test.detail) {
+      const decodedDetail = decodeHtmlEntities(test.detail);
+      if (decodedDetail.length > 200) {
+        detailHtml = `<details class="test-detail-expand">
+          <summary>${escapeHtml(decodedDetail.substring(0, 150))}...</summary>
+          <pre class="test-detail-full">${escapeHtml(decodedDetail)}</pre>
+        </details>`;
+      } else {
+        detailHtml = `<div class="test-detail-short">${escapeHtml(decodedDetail)}</div>`;
+      }
+    }
+    
+    html += `<li class="test-item ${statusClass}">
+      <div class="test-name">${statusIcon} ${escapeHtml(test.name)}</div>
+      ${detailHtml}
+    </li>`;
+  }
+  html += `</ul>`;
+  return html;
 }

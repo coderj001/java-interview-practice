@@ -9,6 +9,7 @@ RUN apt-get update \
 RUN useradd -m -u 10001 sandbox
 
 COPY src ./src
+COPY challenges.json ./challenges.json
 COPY sandbox-runtime ./sandbox-runtime
 COPY target/dependency/ /app/libs/
 

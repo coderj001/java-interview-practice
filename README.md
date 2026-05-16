@@ -143,72 +143,144 @@ npx @fission-ai/openspec@latest
 
 ## LLM Prompts For `challenges.json`
 
-Use these prompts in any web LLM to generate challenge entries you can paste into `challenges.json`.
+Use these few-shot prompts in ChatGPT or Claude web. They are designed to return paste-ready JSON with the same structure used in this repo.
 
-### 1) Reflective/Basic
+### Prompt A: Single Reflective Challenge (Few-Shot)
 
 ```text
-Generate one challenge JSON object for a Java interview platform.
-Mode: reflective.
-Include: id, title, level, tags, details, methodContract, explanation, starterCode, testCases (5+), sandboxProfile { mode, timeoutMs }, hints, rules, resources, examples.
-Method should be deterministic and testable with plain inputs/outputs.
-Output only valid JSON object, no markdown.
+You are generating ONE challenge object for challenges.json.
+
+Rules:
+1) Output ONLY one valid JSON object. No markdown. No explanation.
+2) Keep fields exactly in this shape:
+id, title, level, tags, details, methodContract, explanation, starterCode, testCases, sandboxProfile, aiTestConfig, hints, rules, resources, examples, notes, score, bestScore, attempts, timeSpentMs, completedAt, status
+3) For reflective mode:
+   - sandboxProfile.mode = "reflective"
+   - testCases use fields: name, input, expected
+4) methodContract must be parseable, like:
+   - "int solve(int a, int b)"
+   - "boolean solve(String token)"
+   - "int solve(int[] values)"
+5) starterCode must define public class Solution with matching solve(...) method.
+6) Use status: "not-started", score: null, bestScore: 0, attempts: 0, timeSpentMs: 0, completedAt: null.
+
+Few-shot example input:
+- id: 120
+- topic: palindrome-check-string
+- level: beginner
+
+Few-shot example output:
+{
+  "id": 120,
+  "title": "Palindrome String Check",
+  "level": "beginner",
+  "tags": ["strings", "two-pointers"],
+  "details": "Implement solve(String s) and return true if s is a palindrome when compared exactly (case-sensitive, spaces included).",
+  "methodContract": "boolean solve(String s)",
+  "explanation": "Compare characters from both ends moving inward.",
+  "starterCode": "public class Solution {\n    public boolean solve(String s) {\n        return false;\n    }\n}\n",
+  "testCases": [
+    {"name": "simple palindrome", "input": ["racecar"], "expected": true},
+    {"name": "simple non-palindrome", "input": ["hello"], "expected": false},
+    {"name": "single char", "input": ["a"], "expected": true},
+    {"name": "empty string", "input": [""], "expected": true},
+    {"name": "case sensitive mismatch", "input": ["Aa"], "expected": false}
+  ],
+  "sandboxProfile": {"mode": "reflective", "timeoutMs": 3000},
+  "aiTestConfig": {
+    "promptTemplate": "Generate {count} additional test cases for `{methodContract}` palindrome validation. Return only JSON array with name/input/expected.",
+    "defaultCount": 3
+  },
+  "hints": ["Use two pointers.", "Stop when pointers cross."],
+  "rules": {"maxHintLevel": 2, "guidanceStyle": "direct"},
+  "resources": [],
+  "examples": ["racecar -> true", "hello -> false"],
+  "notes": "",
+  "score": null,
+  "bestScore": 0,
+  "attempts": 0,
+  "timeSpentMs": 0,
+  "completedAt": null,
+  "status": "not-started"
+}
+
+Now generate a new challenge object with:
+- id: {{ID}}
+- topic: {{TOPIC}}
+- level: {{beginner|intermediate|advanced}}
 ```
 
-### 2) Concurrent/Threaded
+### Prompt B: Single Custom JUnit Harness Challenge (Few-Shot)
 
 ```text
-Generate one challenge JSON object for a Java interview platform.
-Mode: concurrent.
-Use a thread-safety problem (rate limiter, bounded buffer, etc).
-Include sandboxProfile with mode: "concurrent", concurrentThreads, timeoutMs.
-Test cases must use threshold-style expected fields like minAccepted, maxRejected, expectNoExceptions.
-Output only valid JSON object.
+You are generating ONE challenge object for challenges.json using custom junit harness mode.
+
+Rules:
+1) Output ONLY one valid JSON object. No markdown. No explanation.
+2) Include all fields:
+id, title, level, tags, details, methodContract, explanation, starterCode, testCases, sandboxProfile, hints, rules, resources, examples, notes, score, bestScore, attempts, timeSpentMs, completedAt, status
+3) sandboxProfile must include:
+   - mode: "custom_test"
+   - runner: "junit"
+   - timeoutMs
+   - harnessClassName
+   - harnessCode
+4) harnessCode must be a complete Java class with JUnit 5 tests.
+5) Keep testCases as placeholder since assertions are in harness.
+
+Few-shot example output:
+{
+  "id": 121,
+  "title": "Custom Echo Harness",
+  "level": "beginner",
+  "tags": ["custom-test", "junit"],
+  "details": "Implement solve(String name) and return the same value.",
+  "methodContract": "String solve(String name)",
+  "explanation": "Return input unchanged.",
+  "starterCode": "public class Solution {\n    public String solve(String name) {\n        return name;\n    }\n}\n",
+  "testCases": [{"name": "placeholder", "input": ["alice"], "expected": "alice"}],
+  "sandboxProfile": {
+    "mode": "custom_test",
+    "runner": "junit",
+    "timeoutMs": 4000,
+    "harnessClassName": "CustomEchoHarness",
+    "harnessCode": "import org.junit.jupiter.api.Test;\nimport static org.junit.jupiter.api.Assertions.*;\n\npublic class CustomEchoHarness {\n    @Test\n    void echoesName() {\n        Solution s = new Solution();\n        assertEquals(\"alice\", s.solve(\"alice\"));\n    }\n}\n"
+  },
+  "hints": [],
+  "rules": {"maxHintLevel": 1, "guidanceStyle": "direct"},
+  "resources": [],
+  "examples": [],
+  "notes": "",
+  "score": null,
+  "bestScore": 0,
+  "attempts": 0,
+  "timeSpentMs": 0,
+  "completedAt": null,
+  "status": "not-started"
+}
+
+Now generate a new custom junit harness challenge with:
+- id: {{ID}}
+- topic: {{TOPIC}}
+- level: {{beginner|intermediate|advanced}}
 ```
 
-### 3) SQL/H2
+### Prompt C: Batch Generator (Mixed Types)
 
 ```text
-Generate one challenge JSON object for a Java interview platform.
-Mode: sql.
-Challenge should execute user SQL against H2.
-Include sandboxProfile { mode: "sql", timeoutMs, setup: [DDL/DML statements] }.
-testCases should validate row-level expected table contents.
-Output only valid JSON object.
-```
+Generate a JSON array of exactly {{COUNT}} challenge objects for challenges.json.
 
-### 4) Custom Test + Raw Runner
-
-```text
-Generate one challenge JSON object for a Java interview platform.
-Mode: custom_test, runner: raw.
-Include sandboxProfile with harnessClassName and harnessCode.
-harnessCode must define a Java class with main(String[] args) and print exactly one EvaluationResult JSON line.
-Output only valid JSON object.
-```
-
-### 5) Custom Test + JUnit/Mockito
-
-```text
-Generate one challenge JSON object for a Java interview platform.
-Mode: custom_test, runner: junit.
-Include sandboxProfile with harnessClassName and harnessCode using JUnit 5 + Mockito.
-Assume imports are available in sandbox libs.
-Keep starterCode minimal and methodContract clear.
-Output only valid JSON object.
-```
-
-### 6) Batch Prompt (All Types)
-
-```text
-Generate 8 challenge JSON objects as an array for a Java interview platform:
-- 3 reflective
-- 2 concurrent
-- 1 sql
-- 1 custom_test raw
-- 1 custom_test junit
-Each object must include full fields:
-id, title, level, tags, details, methodContract, explanation, starterCode, testCases, sandboxProfile, hints, rules, resources, examples, notes, score, bestScore, attempts, timeSpentMs, completedAt, status.
-Use unique ids and realistic test cases.
-Output only valid JSON array.
+Hard constraints:
+1) Output ONLY valid JSON array. No markdown.
+2) Unique numeric id for each object.
+3) Include all fields used by this repo:
+   id, title, level, tags, details, methodContract, explanation, starterCode, testCases, sandboxProfile, hints, rules, resources, examples, notes, score, bestScore, attempts, timeSpentMs, completedAt, status
+4) Distribution:
+   - at least 60% reflective
+   - remaining custom_test junit
+5) For reflective entries: sandboxProfile.mode="reflective", testCases use name/input/expected.
+6) For custom_test entries: sandboxProfile.mode="custom_test", runner="junit", include harnessClassName + harnessCode.
+7) Initialize lifecycle fields as:
+   score=null, bestScore=0, attempts=0, timeSpentMs=0, completedAt=null, status="not-started".
+8) methodContract must be parseable and consistent with starterCode.
 ```

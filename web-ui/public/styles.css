@@ -12,3 +12,19 @@ table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px s
 .workspace{display:grid;gap:12px}.workspace-head{display:flex;align-items:center;gap:12px}.workspace-head h2{margin:0 auto 0 0}.markdown{color:var(--muted)}#editor{min-height:280px;border:1px solid #2d3449;border-radius:8px;overflow:hidden}
 .editor-tools{display:flex;gap:8px;flex-wrap:wrap}textarea{min-height:110px}pre{white-space:pre-wrap;background:#0b1122;border:1px solid #2d3449;border-radius:8px;padding:10px}
 @media (max-width:768px){.app-shell{padding:12px}.top-bar{flex-direction:column;align-items:stretch}}
+
+.output-panel { background: #0b1122; border: 1px solid #2d3449; border-radius: 8px; padding: 14px; font-family: "JetBrains Mono", monospace; font-size: 13px; overflow: auto; max-height: 400px; }
+.test-summary { display: flex; gap: 16px; margin-bottom: 12px; align-items: center; background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; }
+.test-badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+.test-badge.success { background: rgba(0,255,171,.15); color: var(--success); }
+.test-badge.failure { background: rgba(244,63,94,.15); color: var(--error); }
+.test-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.test-item { background: rgba(255,255,255,0.02); border-left: 3px solid #2d3449; padding: 10px; border-radius: 4px; }
+.test-item.test-passed { border-left-color: var(--success); }
+.test-item.test-failed { border-left-color: var(--error); }
+.test-name { font-weight: 600; margin-bottom: 4px; }
+.test-detail-short { color: var(--warn); margin-top: 4px; }
+.test-detail-expand { margin-top: 8px; border-top: 1px dashed #2d3449; padding-top: 8px; }
+.test-detail-expand summary { cursor: pointer; color: var(--muted); outline: none; }
+.test-detail-full { margin-top: 8px; white-space: pre-wrap; font-size: 12px; color: var(--error); background: transparent; padding: 0; border: none; }
+.error-msg { color: var(--error); background: rgba(244,63,94,.15); padding: 12px; border-radius: 6px; }

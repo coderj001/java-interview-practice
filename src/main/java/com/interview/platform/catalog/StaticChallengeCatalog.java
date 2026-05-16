@@ -11,6 +11,7 @@ public class StaticChallengeCatalog implements ChallengeCatalog {
         return List.of(
                 new Challenge("1", "Sum of Two Numbers", Difficulty.BEGINNER, "Add two numbers.", "Use integer addition.", List.of("https://docs.oracle.com/javase/tutorial/java/nutsandbolts/")),
                 new Challenge("4", "Concurrent Graph BFS Queries", Difficulty.INTERMEDIATE, "Handle parallel BFS queries.", "Use thread-safe data access.", List.of("https://docs.oracle.com/javase/tutorial/essential/concurrency/")),
+                new Challenge("6", "User Table CRUD with JDBC", Difficulty.INTERMEDIATE, "Use JDBC statements for insert/update/delete.", "Implement solve(Connection) and execute required DML operations.", List.of("https://docs.oracle.com/javase/tutorial/jdbc/basics/index.html")),
                 new Challenge("24", "Longest Increasing Subsequence", Difficulty.ADVANCED, "Compute LIS length.", "Use dynamic programming.", List.of("https://en.wikipedia.org/wiki/Longest_increasing_subsequence"))
         );
     }
